@@ -1,0 +1,17 @@
+# Virtual environment
+.venv/
+
+# Environment variables
+.env
+
+# Auth session
+.auth_session.json
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Streamlit secrets
+.streamlit/secrets.toml
