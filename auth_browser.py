@@ -123,8 +123,9 @@ def _build_driver():
 
             # Prefer system-installed Chromium (provided by packages.txt)
             _chromium_bins = [
-                "/usr/bin/chromium-browser",
-                "/usr/bin/chromium",
+                "/usr/bin/chromium",           # Debian: chromium
+                "/usr/bin/chromium-browser",   # Ubuntu: chromium-browser
+                "/usr/lib/chromium/chromium",
                 "/usr/lib/chromium-browser/chromium-browser",
                 "/snap/bin/chromium",
             ]
@@ -136,9 +137,9 @@ def _build_driver():
 
             # Prefer system chromedriver to avoid version-mismatch issues
             _driver_bins = [
+                "/usr/bin/chromedriver",               # Debian: chromium-driver
+                "/usr/lib/chromium/chromedriver",      # Debian alt
                 "/usr/lib/chromium-browser/chromedriver",
-                "/usr/bin/chromedriver",
-                "/usr/lib/chromium/chromedriver",
                 "/snap/bin/chromedriver",
             ]
             service = None
