@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import platform
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -66,33 +68,36 @@ def get_auth_token_from_cookies(cookies: List[Dict]) -> Optional[str]:
 # ------------------------------------------------------------------------------
 
 def _build_driver():
-    """Launch Edge (primary) or Chrome (fallback), auto-managing the driver."""
+    """Launch Edge (primary on Windows) or Chrome/Chromium (fallback / Linux)."""
 
-    # -- Try Edge ----------------------------------------------------------
-    try:
-        from selenium import webdriver
-        from selenium.webdriver.edge.service import Service as EdgeService
-        from selenium.webdriver.edge.options import Options as EdgeOptions
-        from webdriver_manager.microsoft import EdgeChromiumDriverManager
+    is_linux = platform.system() == "Linux"
 
-        opts = EdgeOptions()
-        opts.add_argument("--start-maximized")
-        opts.add_argument("--disable-blink-features=AutomationControlled")
-        opts.add_experimental_option("excludeSwitches", ["enable-automation"])
-        opts.add_experimental_option("useAutomationExtension", False)
-        opts.add_argument(
-            "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0"
-        )
-        service = EdgeService(EdgeChromiumDriverManager().install())
-        driver = webdriver.Edge(service=service, options=opts)
-        print("  [OK] Browser: Microsoft Edge")
-        return driver
-    except Exception as e:
-        print(f"  [Edge unavailable: {e}] -> trying Chrome ...")
+    # -- Try Edge (Windows only) -------------------------------------------
+    if not is_linux:
+        try:
+            from selenium import webdriver
+            from selenium.webdriver.edge.service import Service as EdgeService
+            from selenium.webdriver.edge.options import Options as EdgeOptions
+            from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
-    # -- Try Chrome --------------------------------------------------------
+            opts = EdgeOptions()
+            opts.add_argument("--start-maximized")
+            opts.add_argument("--disable-blink-features=AutomationControlled")
+            opts.add_experimental_option("excludeSwitches", ["enable-automation"])
+            opts.add_experimental_option("useAutomationExtension", False)
+            opts.add_argument(
+                "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0"
+            )
+            service = EdgeService(EdgeChromiumDriverManager().install())
+            driver = webdriver.Edge(service=service, options=opts)
+            print("  [OK] Browser: Microsoft Edge")
+            return driver
+        except Exception as e:
+            print(f"  [Edge unavailable: {e}] -> trying Chrome ...")
+
+    # -- Try Chrome / Chromium ---------------------------------------------
     try:
         from selenium import webdriver
         from selenium.webdriver.chrome.service import Service as ChromeService
@@ -100,13 +105,59 @@ def _build_driver():
         from webdriver_manager.chrome import ChromeDriverManager
 
         opts = ChromeOptions()
-        opts.add_argument("--start-maximized")
         opts.add_argument("--disable-blink-features=AutomationControlled")
-        opts.add_experimental_option("excludeSwitches", ["enable-automation"])
-        opts.add_experimental_option("useAutomationExtension", False)
-        service = ChromeService(ChromeDriverManager().install())
+
+        if is_linux:
+            # Headless mode required on Streamlit Cloud (no display server)
+            opts.add_argument("--headless=new")
+            opts.add_argument("--no-sandbox")
+            opts.add_argument("--disable-dev-shm-usage")
+            opts.add_argument("--disable-gpu")
+            opts.add_argument("--disable-setuid-sandbox")
+            opts.add_argument("--window-size=1920,1080")
+            opts.add_argument(
+                "user-agent=Mozilla/5.0 (X11; Linux x86_64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            )
+
+            # Prefer system-installed Chromium (provided by packages.txt)
+            _chromium_bins = [
+                "/usr/bin/chromium-browser",
+                "/usr/bin/chromium",
+                "/usr/lib/chromium-browser/chromium-browser",
+                "/snap/bin/chromium",
+            ]
+            for _bin in _chromium_bins:
+                if os.path.exists(_bin):
+                    opts.binary_location = _bin
+                    print(f"  [INFO] Using system Chromium: {_bin}")
+                    break
+
+            # Prefer system chromedriver to avoid version-mismatch issues
+            _driver_bins = [
+                "/usr/lib/chromium-browser/chromedriver",
+                "/usr/bin/chromedriver",
+                "/usr/lib/chromium/chromedriver",
+                "/snap/bin/chromedriver",
+            ]
+            service = None
+            for _drv in _driver_bins:
+                if os.path.exists(_drv):
+                    service = ChromeService(_drv)
+                    print(f"  [INFO] Using system chromedriver: {_drv}")
+                    break
+            if service is None:
+                service = ChromeService(ChromeDriverManager().install())
+        else:
+            opts.add_argument("--start-maximized")
+            opts.add_experimental_option("excludeSwitches", ["enable-automation"])
+            opts.add_experimental_option("useAutomationExtension", False)
+            service = ChromeService(ChromeDriverManager().install())
+
         driver = webdriver.Chrome(service=service, options=opts)
-        print("  [OK] Browser: Google Chrome")
+        label = "Google Chrome (headless)" if is_linux else "Google Chrome"
+        print(f"  [OK] Browser: {label}")
         return driver
     except Exception as e:
         raise RuntimeError(
