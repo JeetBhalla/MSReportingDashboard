@@ -563,33 +563,30 @@ def show_login() -> None:
         with tab_cookie:
             st.markdown(
                 """
-**How to get your session cookie in 3 steps:**
+**How to copy ALL cookies in 3 steps:**
 
-1. Open **[Agility](https://www19.v1host.com/FedEx)** in your browser and sign in with OKTA as normal.
-2. Press **F12** → **Application** tab → **Cookies** → click `https://www19.v1host.com`.
-3. Find the cookie whose **Name** contains `versionone`, `v1session`, or `session` — copy its **Name** and **Value** below.
+1. Open **[Agility](https://www19.v1host.com/FedEx)** in your browser and sign in with OKTA.
+2. Press **F12** → **Network** tab → refresh the page → click any request to `www19.v1host.com` → **Headers** → find the **`Cookie:`** request header → copy the entire value.
+3. Paste the full string below and click **Connect**.
+
+> **Alternatively** (Application tab method): F12 → Application → Cookies → `https://www19.v1host.com` → for each of the 4 cookies (`V1.FederatedAuth.FedEx`, `V1.OidcAccessToken.FedEx`, `V1.OidcRefreshToken.FedEx`, `V1.Ticket.FedEx`) copy name=value and join with `;`
                 """
             )
-            cookie_name = st.text_input(
-                "COOKIE NAME",
-                placeholder="e.g.  .versionone  or  V1session",
-                key="manual_cookie_name",
-            )
-            cookie_value = st.text_input(
-                "COOKIE VALUE",
-                type="password",
-                placeholder="Paste the full cookie value here",
-                key="manual_cookie_value",
+            cookie_string = st.text_area(
+                "PASTE FULL COOKIE STRING",
+                placeholder="V1.FederatedAuth.FedEx=abc123; V1.OidcAccessToken.FedEx=xyz...; V1.Ticket.FedEx=def...",
+                height=120,
+                key="manual_cookie_string",
             )
             if st.button("🔑  Connect", use_container_width=True, type="primary", key="btn_cookie"):
-                if not cookie_name or not cookie_value:
-                    st.error("Please enter both the cookie name and its value.")
+                if not cookie_string or not cookie_string.strip():
+                    st.error("Please paste the cookie string from DevTools.")
                 else:
                     try:
-                        cookies = manual_cookie_login(cookie_name, cookie_value, AGILITY_BASE_URL)
+                        cookies = manual_cookie_login(cookie_string, AGILITY_BASE_URL)
                         st.session_state.cookies = cookies
                         st.session_state.show_dashboard = True
-                        st.success("Session accepted! Loading dashboard…")
+                        st.success(f"Session accepted ({len(cookies)} cookies loaded)! Loading dashboard…")
                         st.rerun()
                     except Exception as exc:
                         st.error(f"Failed to set session: {exc}")

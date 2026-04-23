@@ -409,20 +409,30 @@ def _fill_okta_form(driver, username: str, password: str) -> None:
 # Manual cookie login (cloud / headless fallback)
 # ------------------------------------------------------------------------------
 
-def manual_cookie_login(cookie_name: str, cookie_value: str, base_url: str) -> List[Dict]:
+def manual_cookie_login(cookie_string: str, base_url: str) -> List[Dict]:
     """
-    Build a session from a manually pasted browser cookie.
+    Parse all cookies from a raw cookie header string (name=value; name=value; ...)
+    and build a session. Accepts the full cookie string copied from DevTools.
     Works on Streamlit Cloud without any browser or MFA interaction.
     """
     host = base_url.rstrip("/").split("/")[2]
-    cookies = [
-        {
-            "name":   cookie_name.strip(),
-            "value":  cookie_value.strip(),
-            "domain": host,
-            "path":   "/",
-        }
-    ]
+    cookies: List[Dict] = []
+    for part in cookie_string.split(";"):
+        part = part.strip()
+        if not part or "=" not in part:
+            continue
+        name, _, value = part.partition("=")
+        name  = name.strip()
+        value = value.strip()
+        if name and value:
+            cookies.append({
+                "name":   name,
+                "value":  value,
+                "domain": host,
+                "path":   "/",
+            })
+    if not cookies:
+        raise ValueError("No valid cookies found. Paste the full cookie string from DevTools.")
     save_session(cookies, base_url)
     return cookies
 
