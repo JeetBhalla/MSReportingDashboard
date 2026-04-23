@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FedEx Agility Dashboard — Interactive Training Guide</title>
+<style>
+  :root {
+    --fedex-purple: #4D148C;
+    --fedex-orange: #FF6200;
+    --accent-green:  #00A86B;
+    --accent-light:  #F0E6FF;
+    --text-dark:     #222222;
+    --text-mid:      #555555;
+    --bg:            #F7F7F7;
+    --card:          #FFFFFF;
+    --border:        #E0E0E0;
+    --progress-h:    6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Inter, sans-serif;
+    background: var(--bg);
+    color: var(--text-dark);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── HEADER ── */
+  .app-header {
+    background: linear-gradient(135deg, var(--fedex-purple) 0%, var(--fedex-orange) 100%);
+    padding: 16px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 3px 12px rgba(0,0,0,.2);
+  }
+  .app-header h1 { color:#fff; font-size:20px; font-weight:700; letter-spacing:.3px; }
+  .app-header .badge {
+    background:rgba(255,255,255,.18); color:#fff;
+    font-size:12px; padding:4px 12px; border-radius:20px; border:1px solid rgba(255,255,255,.35);
+  }
+
+  /* ── PROGRESS BAR ── */
+  .progress-wrap { background:var(--fedex-purple); padding:0 40px 10px; }
+  .progress-bar-track {
+    background:rgba(255,255,255,.25); border-radius:3px; height:var(--progress-h); overflow:hidden;
+  }
+  .progress-bar-fill {
+    height:100%; background:#fff; border-radius:3px;
+    transition: width .4s ease;
+  }
+  .progress-label { color:rgba(255,255,255,.8); font-size:11px; margin-top:5px; }
+
+  /* ── STEP DOTS ── */
+  .dots-row {
+    display:flex; gap:6px; justify-content:center;
+    padding:16px 0 0;
+  }
+  .dot {
+    width:10px; height:10px; border-radius:50%;
+    background:var(--border); cursor:pointer;
+    transition: background .25s, transform .2s;
+    border:2px solid transparent;
+  }
+  .dot.active { background:var(--fedex-purple); transform:scale(1.35); border-color:var(--fedex-purple); }
+  .dot.done   { background:var(--accent-green); }
+  .dot:hover  { transform:scale(1.25); }
+
+  /* ── MAIN LAYOUT ── */
+  .main {
+    display:flex; flex:1; gap:0;
+    max-width:1200px; width:100%; margin:0 auto; padding:28px 24px 40px;
+    flex-direction: column;
+  }
+
+  /* ── SLIDE ── */
+  .slide { display:none; animation: fadeIn .35s ease; }
+  .slide.active { display:block; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+  .slide-inner {
+    display:grid; grid-template-columns:1fr 1fr; gap:28px; align-items:start;
+  }
+  @media(max-width:820px){ .slide-inner { grid-template-columns:1fr; } }
+
+  /* LEFT — narration */
+  .narration-panel {
+    background:var(--card); border-radius:14px; padding:32px 30px;
+    box-shadow:0 2px 12px rgba(0,0,0,.07); border:1px solid var(--border);
+  }
+  .section-tag {
+    display:inline-block; background:var(--accent-light); color:var(--fedex-purple);
+    font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    padding:3px 10px; border-radius:20px; margin-bottom:10px;
+  }
+  .slide-title { font-size:22px; font-weight:700; color:var(--fedex-purple); margin-bottom:14px; line-height:1.3; }
+  .narration { font-size:14.5px; color:var(--text-mid); line-height:1.75; }
+  .narration strong { color:var(--text-dark); }
+  .narration ul { margin:10px 0 10px 18px; }
+  .narration li { margin-bottom:6px; }
+  .narration .tip {
+    margin-top:18px; background:#FFF8F0; border-left:3px solid var(--fedex-orange);
+    padding:10px 14px; border-radius:0 8px 8px 0; font-size:13px; color:#7A3800;
+  }
+  .narration .tip strong { color:var(--fedex-orange); }
+
+  /* RIGHT — mock UI */
+  .ui-panel {
+    background:var(--card); border-radius:14px; overflow:hidden;
+    box-shadow:0 2px 12px rgba(0,0,0,.09); border:1px solid var(--border);
+    position:relative;
+  }
+  .ui-chrome {
+    background:linear-gradient(135deg,var(--fedex-purple) 0%,var(--fedex-orange) 100%);
+    padding:12px 20px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .ui-chrome span { color:#fff; font-size:14px; font-weight:700; }
+  .ui-chrome .signout-mock {
+    background:rgba(255,255,255,.9); color:var(--fedex-purple);
+    font-size:12px; font-weight:600; padding:4px 12px; border-radius:6px;
+  }
+  .ui-body { padding:20px; }
+
+  /* mock filter bar */
+  .filter-bar { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
+  .mock-select {
+    flex:1; min-width:130px; background:#fff; border:2px solid var(--border);
+    border-radius:8px; padding:8px 12px; font-size:12px; color:var(--text-mid);
+    position:relative; display:flex; align-items:center; justify-content:space-between;
+  }
+  .mock-select.highlight { border-color:var(--fedex-purple); box-shadow:0 0 0 3px rgba(77,20,140,.13); }
+  .mock-select::after { content:"▾"; color:#999; }
+  .mock-btn {
+    background:linear-gradient(135deg,var(--fedex-purple),#6A1FA0);
+    color:#fff; border-radius:8px; padding:8px 16px; font-size:12px; font-weight:600;
+    white-space:nowrap; display:flex; align-items:center; gap:5px;
+  }
+
+  /* mock metric cards */
+  .metric-row { display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; }
+  .metric-card {
+    flex:1; min-width:80px; background:#fff; border:2px solid var(--border);
+    border-radius:10px; padding:12px 14px;
+    box-shadow:0 1px 4px rgba(0,0,0,.05);
+  }
+  .metric-label { font-size:10px; color:var(--fedex-purple); text-transform:uppercase; font-weight:700; letter-spacing:.06em; }
+  .metric-value { font-size:20px; font-weight:800; color:var(--text-dark); margin-top:4px; }
+  .metric-delta { font-size:10px; color:#888; margin-top:2px; }
+
+  /* mock tabs */
+  .mock-tabs { display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
+  .mock-tab {
+    padding:7px 14px; border-radius:8px; font-size:12px; font-weight:600;
+    background:#fff; border:2px solid var(--border); color:#777;
+    cursor:default;
+  }
+  .mock-tab.active-tab {
+    background:linear-gradient(135deg,var(--fedex-purple),#6A1FA0);
+    color:#fff; border-color:var(--fedex-purple);
+    box-shadow:0 3px 10px rgba(77,20,140,.25);
+  }
+
+  /* mock bar chart */
+  .chart-wrap { background:#fff; border:1px solid var(--border); border-radius:10px; padding:16px; }
+  .chart-title { font-size:12px; font-weight:700; color:var(--fedex-purple); margin-bottom:12px; }
+  .chart-bars { display:flex; align-items:flex-end; gap:10px; height:110px; }
+  .bar-group { display:flex; align-items:flex-end; gap:3px; flex:1; flex-direction:column; align-items:center; }
+  .bar-pair { display:flex; align-items:flex-end; gap:3px; }
+  .bar {
+    border-radius:4px 4px 0 0; width:18px; position:relative;
+    transition: height .5s ease;
+  }
+  .bar.purple { background:var(--fedex-purple); }
+  .bar.green  { background:var(--accent-green); }
+  .bar-label  { font-size:9px; color:#999; margin-top:4px; text-align:center; max-width:50px; }
+  .bar-pct {
+    font-size:9px; font-weight:700; color:var(--fedex-purple);
+    background:rgba(77,20,140,.09); border:1px solid var(--fedex-purple);
+    border-radius:4px; padding:1px 4px; margin-bottom:3px; white-space:nowrap;
+  }
+
+  /* mock line chart */
+  .line-chart { background:#fff; border:1px solid var(--border); border-radius:10px; padding:16px; }
+  .sparkline { display:flex; align-items:flex-end; gap:6px; height:60px; margin-top:8px; }
+  .spark-bar { flex:1; border-radius:3px 3px 0 0; background:rgba(255,107,53,.15); border-top:2px solid var(--fedex-orange); }
+
+  /* mock table */
+  .mock-table { width:100%; border-collapse:collapse; font-size:11px; }
+  .mock-table th {
+    background:var(--accent-light); color:var(--fedex-purple);
+    padding:6px 8px; text-align:left; font-weight:700; font-size:10px; text-transform:uppercase;
+    letter-spacing:.05em;
+  }
+  .mock-table td { padding:6px 8px; border-bottom:1px solid #F0F0F0; color:var(--text-mid); }
+  .mock-table tr:last-child td { border-bottom:none; }
+  .badge-green  { background:#E6F9F1; color:var(--accent-green); padding:1px 7px; border-radius:10px; font-weight:700; font-size:10px; }
+  .badge-orange { background:#FFF3E8; color:var(--fedex-orange); padding:1px 7px; border-radius:10px; font-weight:700; font-size:10px; }
+  .badge-purple { background:var(--accent-light); color:var(--fedex-purple); padding:1px 7px; border-radius:10px; font-weight:700; font-size:10px; }
+
+  /* login mock */
+  .login-mock { padding:30px 24px; display:flex; flex-direction:column; align-items:center; gap:12px; }
+  .login-icon { font-size:40px; }
+  .login-title { font-size:18px; font-weight:700; color:var(--fedex-purple); }
+  .login-sub { font-size:12px; color:#888; text-align:center; max-width:260px; }
+  .mock-input {
+    width:100%; background:#fff; border:2px solid var(--border);
+    border-radius:8px; padding:9px 14px; font-size:12px; color:#bbb;
+  }
+  .mock-input.highlight { border-color:var(--fedex-purple); color:var(--text-mid); }
+  .mock-primary-btn {
+    width:100%; background:linear-gradient(135deg,var(--fedex-purple),#6A1FA0);
+    color:#fff; border-radius:10px; padding:11px; font-size:13px; font-weight:700;
+    text-align:center; box-shadow:0 3px 10px rgba(77,20,140,.3);
+  }
+  .session-banner {
+    width:100%; background:#E6F9F1; border:1px solid var(--accent-green);
+    border-radius:8px; padding:8px 14px; font-size:12px; color:var(--accent-green);
+    font-weight:600; text-align:center;
+  }
+
+  /* pulse highlight animation */
+  @keyframes pulse-border {
+    0%,100%{ box-shadow:0 0 0 0 rgba(77,20,140,.4); }
+    50%    { box-shadow:0 0 0 7px rgba(77,20,140,.0); }
+  }
+  .pulse { animation: pulse-border 1.6s infinite; }
+
+  /* ── NAVIGATION ── */
+  .nav-row {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-top:24px; gap:12px;
+  }
+  .nav-btn {
+    display:flex; align-items:center; gap:8px;
+    padding:11px 26px; border-radius:10px; font-size:14px; font-weight:700;
+    cursor:pointer; border:none; transition:all .2s;
+  }
+  .nav-btn.prev {
+    background:var(--card); color:var(--fedex-purple);
+    border:2px solid var(--fedex-purple);
+  }
+  .nav-btn.prev:hover { background:var(--accent-light); }
+  .nav-btn.next {
+    background:linear-gradient(135deg,var(--fedex-purple),var(--fedex-orange));
+    color:#fff; box-shadow:0 4px 14px rgba(77,20,140,.3);
+  }
+  .nav-btn.next:hover { opacity:.92; transform:translateY(-1px); }
+  .nav-btn:disabled { opacity:.35; cursor:not-allowed; transform:none !important; }
+  .slide-counter { font-size:13px; color:#999; font-weight:600; }
+
+  /* ── FINAL SLIDE ── */
+  .final-card {
+    background:linear-gradient(135deg,var(--fedex-purple) 0%,var(--fedex-orange) 100%);
+    border-radius:16px; padding:48px 40px; text-align:center; color:#fff;
+  }
+  .final-card h2 { font-size:28px; font-weight:800; margin-bottom:12px; }
+  .final-card p  { font-size:15px; opacity:.88; max-width:500px; margin:0 auto 28px; line-height:1.65; }
+  .final-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:24px 0; }
+  .final-item {
+    background:rgba(255,255,255,.15); border-radius:10px;
+    padding:16px; border:1px solid rgba(255,255,255,.25);
+  }
+  .final-item .fi-icon { font-size:26px; margin-bottom:6px; }
+  .final-item .fi-label { font-size:12px; opacity:.9; font-weight:600; }
+  .restart-btn {
+    display:inline-block; background:#fff; color:var(--fedex-purple);
+    font-size:14px; font-weight:700; padding:12px 32px; border-radius:10px;
+    cursor:pointer; border:none; box-shadow:0 4px 14px rgba(0,0,0,.15);
+    transition:all .2s;
+  }
+  .restart-btn:hover { transform:translateY(-2px); box-shadow:0 6px 18px rgba(0,0,0,.2); }
+
+  /* expander mock */
+  .mock-expander {
+    border:1px solid var(--border); border-radius:8px; overflow:hidden; margin-top:10px;
+  }
+  .mock-expander-header {
+    background:var(--accent-light); padding:9px 14px; font-size:12px;
+    font-weight:700; color:var(--fedex-purple); display:flex; justify-content:space-between;
+    align-items:center;
+  }
+  .mock-expander-body { padding:12px 14px; font-size:11px; color:var(--text-mid); }
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<div class="app-header">
+  <h1>📦 FedEx Agility Dashboard — Interactive Training Guide</h1>
+  <span class="badge">10 Sections · Self-Paced</span>
+</div>
+
+<!-- ── PROGRESS ── -->
+<div class="progress-wrap">
+  <div class="progress-bar-track">
+    <div class="progress-bar-fill" id="progressFill" style="width:10%"></div>
+  </div>
+  <div class="progress-label" id="progressLabel">Section 1 of 10</div>
+</div>
+
+<!-- ── DOT NAV ── -->
+<div class="dots-row" id="dotsRow"></div>
+
+<!-- ── MAIN ── -->
+<div class="main">
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 1 — OVERVIEW
+  ══════════════════════════════════════════ -->
+  <div class="slide active" id="slide-0">
+    <div class="slide-inner">
+      <div class="narration-panel">
+        <span class="section-tag">Introduction</span>
+        <div class="slide-title">Welcome to the FedEx Agility Dashboard</div>
+        <div class="narration">
+          The <strong>FedEx Agility Sprint Dashboard</strong> is a real-time reporting tool that connects directly to <strong>Agility VersionOne</strong> — the system your teams use to manage sprints and stories every day.
+          <br><br>
+          It is designed for:
+          <ul>
+            <li><strong>Scrum Masters</strong> — track team velocity and identify carry-overs</li>
+            <li><strong>Programme Managers / RTEs</strong> — monitor ART delivery rates at a glance</li>
+            <li><strong>Team Leads</strong> — compare team performance within a programme</li>
+            <li><strong>Sprint Review facilitators</strong> — validate pull-forward and carry-over stories with live data</li>
+          </ul>
+          <div class="tip"><strong>Key benefit:</strong> No spreadsheets. No manual exports. Data is pulled live from Agility and refreshed on demand.</div>
+        </div>
+      </div>
+      <div class="ui-panel">
+        <div class="ui-chrome">
+          <span>📦 FedEx Agility Dashboard</span>
+        </div>
+        <div class="ui-body">
+          <div style="text-align:center;padding:20px 0 14px;">
+            <div style="font-size:44px;">📦</div>
+            <div style="font-size:17px;font-weight:800;color:#4D148C;margin:8px 0 4px;">FedEx Agility Dashboard</div>
+            <div style="font-size:12px;color:#999;">Real-time sprint and ART performance reporting</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:16px 0;">
+            <div class="final-item" style="background:var(--accent-light);border:1px solid #C5A8E8;">
+              <div class="fi-icon">📊</div>
+              <div class="fi-label" style="color:var(--fedex-purple);">ART Performance</div>
+            </div>
+            <div class="final-item" style="background:#E6F9F1;border:1px solid #A8DFC8;">
+              <div class="fi-icon">👥</div>
+              <div class="fi-label" style="color:var(--accent-green);">Team Analysis</div>
+            </div>
+            <div class="final-item" style="background:#FFF3E8;border:1px solid #FFCCA0;">
+              <div class="fi-icon">📈</div>
+              <div class="fi-label" style="color:var(--fedex-orange);">Sprint Velocity</div>
+            </div>
+          </div>
+          <div style="background:#F8F4FF;border-radius:8px;padding:12px 14px;font-size:11px;color:var(--text-mid);border:1px solid #D9C8F0;">
+            <strong style="color:var(--fedex-purple);">Coverage:</strong> SCO P&amp;D — Conveyance · Plan &amp; Prepare · Run &amp; Close<br>
+            <strong style="color:var(--fedex-purple);">Data source:</strong> Agility VersionOne (live)<br>
+            <strong style="color:var(--fedex-purple);">Session duration:</strong> 8 hours
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 2 — LOGIN
+  ══════════════════════════════════════════ -->
+  <div class="slide" id="slide-1">
+    <div class="slide-inner">
+      <div class="narration-panel">
+        <span class="section-tag">Section 1 — Sign In</span>
+        <div class="slide-title">Signing In with OKTA</div>
+        <div class="narration">
+          When you first open the dashboard you'll see the <strong>login page</strong>.
+          <br><br>
+          <strong>Steps:</strong>
+          <ul>
+            <li>Enter your <strong>FedEx employee ID</strong> or email address</li>
+            <li>Enter your <strong>OKTA password</strong></li>
+            <li>Click <strong>Sign in with OKTA</strong></li>
+            <li>A browser window opens — approve the <strong>MFA push notification</strong> on your phone</li>
+            <li>The window closes automatically and you land on the dashboard</li>
+          </ul>
+          Your session stays active for <strong>8 hours</strong>. On your next visit the banner will show <em>"Existing session found"</em> — click <strong>Go to Dashboard</strong> to skip re-login.
+          <div class="tip"><strong>Tip:</strong> If you're on Streamlit Cloud, use the <strong>"Paste Session Cookie"</strong> tab — copy the cookie value from your browser's DevTools after logging in normally.</div>
+        </div>
+      </div>
+      <div class="ui-panel">
+        <div class="ui-chrome"><span>Sign In</span></div>
+        <div class="login-mock">
+          <div class="login-icon">📦</div>
+          <div class="login-title">FedEx Agility Dashboard</div>
+          <div class="login-sub">Enter your FedEx credentials to sign in via OKTA.</div>
+          <div class="session-banner">✅ Existing session found</div>
+          <input class="mock-input highlight" value="Go to Dashboard →" readonly style="text-align:center;cursor:pointer;font-weight:700;color:var(--fedex-purple);">
+          <div style="font-size:11px;color:#aaa;text-align:center;">— or sign in again below —</div>
+          <input class="mock-input" placeholder="USERNAME / EMPLOYEE ID" readonly>
+          <input class="mock-input" placeholder="PASSWORD  ••••••••" readonly>
+          <div class="mock-primary-btn pulse">🔐  Sign in with OKTA</div>
+          <div style="font-size:10px;color:#aaa;text-align:center;">A browser window will open. Approve the MFA push — window closes automatically.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 3 — FILTER BAR
+  ══════════════════════════════════════════ -->
+  <div class="slide" id="slide-2">
+    <div class="slide-inner">
+      <div class="narration-panel">
+        <span class="section-tag">Section 2 — Filters</span>
+        <div class="slide-title">The Filter Bar — Your Control Panel</div>
+        <div class="narration">
+          At the top of every dashboard page sits the <strong>filter bar</strong>. All charts and tables respond to changes here.
+          <br><br>
+          <ul>
+            <li><strong>ART dropdown</strong> — Select the Agile Release Train: Conveyance, Plan &amp; Prepare, or Run &amp; Close. The Teams dropdown updates instantly.</li>
+            <li><strong>Teams multi-select</strong> — Pick one team for a deep-dive, or <em>select multiple teams</em> to compare side by side. No limit on selections.</li>
+            <li><strong>From / To dates</strong> — Zoom into a PI, quarter, or any custom window. Leave blank to default to the <em>current calendar year</em>.</li>
+            <li><strong>🔄 Refresh</strong> — Clears the cache and pulls the very latest data from Agility. Use this right after a sprint closes.</li>
+          </ul>
+          <div class="tip"><strong>Tip:</strong> For PI review meetings, set the From/To dates to the PI start and end dates to scope all charts to that PI only.</div>
+        </div>
+      </div>
+      <div class="ui-panel">
+        <div class="ui-chrome"><span>Dashboard — Filter Bar</span><span class="signout-mock">🔓 Sign out</span></div>
+        <div class="ui-body">
+          <div class="filter-bar">
+            <div class="mock-select highlight pulse" style="flex:2;">
+              <span>ART: <strong>SCO - P&amp;D - Run and Close</strong></span>
+            </div>
+            <div class="mock-select highlight" style="flex:2;">
+              <span>Teams: <strong>Code Busters, Eagles +3</strong></span>
+            </div>
+            <div class="mock-select" style="flex:1;min-width:100px;"><span>From: 2026-01-01</span></div>
+            <div class="mock-select" style="flex:1;min-width:100px;"><span>To: 2026-12-31</span></div>
+            <div class="mock-btn">🔄 Refresh</div>
+          </div>
+          <div style="background:#F8F4FF;border-radius:8px;padding:10px 14px;font-size:11px;color:var(--text-mid);border:1px solid #D9C8F0;margin-bottom:12px;">
+            <strong style="color:var(--fedex-purple);">ARTs available:</strong><br>
+            · SCO - P&amp;D - Conveyance<br>
+            · SCO - P&amp;D - Plan &amp; Prepare<br>
+            · <strong style="color:var(--fedex-purple);">SCO - P&amp;D - Run and Close ✓ selected</strong>
+          </div>
+          <div style="background:#FFF3E8;border-radius:8px;padding:10px 14px;font-size:11px;color:var(--text-mid);border:1px solid #FFD0A8;">
+            <strong style="color:var(--fedex-orange);">Selected Teams (5):</strong><br>
+            Code Busters · Eagles · Dev-Inators · Hawks · Megaminds
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 4 — METRIC CARDS
+  ══════════════════════════════════════════ -->
+  <div class="slide" id="slide-3">
+    <div class="slide-inner">
+      <div class="narration-panel">
+        <span class="section-tag">Section 3 — Summary Cards</span>
+        <div class="slide-title">Headline Metrics — Instant Snapshot</div>
+        <div class="narration">
+          Immediately after selecting your teams, five <strong>summary metric cards</strong> appear. These give you an executive-level snapshot without needing to read a single chart.
+          <br><br>
+          <ul>
+            <li><strong>Selected Teams</strong> — number of teams currently in scope</li>
+            <li><strong>Total Sprints</strong> — count of sprints matching your date filter</li>
+            <li><strong>Planned Stories</strong> — total stories committed across all sprints</li>
+            <li><strong>Delivered Stories</strong> — total stories completed</li>
+            <li><strong>Overall Delivery Rate</strong> — the headline % with raw story-point totals as a delta</li>
+          </ul>
+          <div class="tip"><strong>How to use it:</strong> In a PI planning or RTE sync, this five-number summary answers "are we on track?" before opening a single chart.</div>
+        </div>
+      </div>
+      <div class="ui-panel">
+        <div class="ui-chrome"><span>Summary Metrics</span></div>
+        <div class="ui-body">
+          <div class="metric-row">
+            <div class="metric-card">
+              <div class="metric-label">Selected Teams</div>
+              <div class="metric-value">5</div>
+              <div class="metric-delta">teams in scope</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Total Sprints</div>
+              <div class="metric-value">47</div>
+              <div class="metric-delta">2026 YTD</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Planned Stories</div>
+              <div class="metric-value">384</div>
+              <div class="metric-delta">committed</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Delivered</div>
+              <div class="metric-value">341</div>
+              <div class="metric-delta">completed</div>
+            </div>
+            <div class="metric-card pulse" style="border-color:var(--fedex-purple);">
+              <div class="metric-label">Overall Delivery</div>
+              <div class="metric-value" style="color:var(--accent-green);">88.8%</div>
+              <div class="metric-delta">341 / 384 pts</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <div style="flex:1;background:var(--accent-light);border-radius:8px;padding:10px 12px;text-align:center;">
+              <div style="font-size:10px;color:var(--fedex-purple);font-weight:700;">BEST SPRINT</div>
+              <div style="font-size:15px;font-weight:800;color:var(--fedex-purple);">94.3%</div>
+              <div style="font-size:10px;color:#888;">Sprint 6 — Run &amp; Close</div>
+            </div>
+            <div style="flex:1;background:#E6F9F1;border-radius:8px;padding:10px 12px;text-align:center;">
+              <div style="font-size:10px;color:var(--accent-green);font-weight:700;">YTD POINTS</div>
+              <div style="font-size:15px;font-weight:800;color:var(--accent-green);">1,247</div>
+              <div style="font-size:10px;color:#888;">delivered of 1,404 planned</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 5 — TAB 1: ART CHART
+  ══════════════════════════════════════════ -->
+  <div class="slide" id="slide-4">
+    <div class="slide-inner">
+      <div class="narration-panel">
+        <span class="section-tag">Section 4 — Tab 1</span>
+        <div class="slide-title">Committed vs Completed by ART</div>
+        <div class="narration">
+          The first tab is the <strong>ART-level health check</strong> — ideal for programme and PI-level conversations.
+          <br><br>
+          The <strong>grouped bar chart</strong> shows:
+          <ul>
+            <li><span style="color:var(--fedex-purple);font-weight:700;">■ Purple bars</span> — Committed stories</li>
+            <li><span style="color:var(--accent-green);font-weight:700;">■ Green bars</span> — Completed stories</li>
+            <li><strong>Purple % badge</strong> above each group — the delivery rate</li>
+          </ul>
+          When teams from multiple ARTs are selected, each ART gets its own bar group for cross-programme comparison. When a single ART is selected, you see that programme's aggregated numbers.
+          <div class="tip"><strong>Best for:</strong> PI Planning reviews · Programme Board updates · RTE sync meetings</div>
+        </div>
+      </div>
+      <div class="ui-panel">
+        <div class="ui-chrome"><span>Tab 1 — ART Performance</span></div>
+        <div class="ui-body">
+          <div class="mock-tabs">
+            <div class="mock-tab active-tab pulse">📊 Committed vs Completed by ART</div>
+            <div class="mock-tab">👥 Team Performance</div>
+          </div>
+          <div class="chart-wrap">
+            <div class="chart-title">Committed vs Completed — Run &amp; Close — 2026</div>
+            <div style="display:flex;align-items:flex-end;gap:16px;height:120px;padding:0 8px;">
+              <!-- Group 1 -->
+              <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+                <div class="bar-pct">88%</div>
+                <div class="bar-pair">
+                  <div class="bar purple" style="height:90px;"></div>
+                  <div class="bar green"  style="height:79px;"></div>
+                </div>
+                <div class="bar-label">Run &amp; Close</div>
+              </div>
+              <!-- Group 2 -->
+              <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+                <div class="bar-pct">82%</div>
+                <div class="bar-pair">
+                  <div class="bar purple" style="height:70px;"></div>
+                  <div class="bar green"  style="height:57px;"></div>
+                </div>
+                <div class="bar-label">Conveyance</div>
+              </div>
+              <!-- Group 3 -->
+              <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+                <div class="bar-pct">91%</div>
+                <div class="bar-pair">
+                  <div class="bar purple" style="height:80px;"></div>
+                  <div class="bar green"  style="height:73px;"></div>
+                </div>
+                <div class="bar-label">Plan &amp; Prepare</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:12px;margin-top:10px;justify-content:center;">
+              <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:#555;">
+                <div style="width:12px;height:12px;background:var(--fedex-purple);border-radius:2px;"></div>Committed
+              </div>
+              <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:#555;">
+                <div style="width:12px;height:12px;background:var(--accent-green);border-radius:2px;"></div>Completed
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 6 — TAB 2: TEAM PERFORMANCE
+  ══════════════════════════════════════════ -->
+  <div class="slide" id="slide-5">
+    <div class="slide-inner">
+      <div class="narration-panel">
+        <span class="section-tag">Section 5 — Tab 2</span>
+        <div class="slide-title">Team Performance — Side-by-Side Comparison</div>
+        <div class="narration">
+          The second tab drills one level deeper — <strong>individual team performance</strong> within your selected ART.
+          <br><br>
+          <ul>
+            <li>Every selected team appears as its own bar group</li>
+            <li>Teams are sorted alphabetically</li>
+            <li>Delivery rate percentages are annotated above each team</li>
+            <li>The chart height adjusts automatically when many teams are selected</li>
+          </ul>
+          <strong>Interactive click-through:</strong> Click any team's bar in this chart and a new <strong>Sprint Velocity tab</strong> appears automatically — drilling from programme view to individual sprint detail in one click.
+          <div class="tip"><strong>Tip:</strong> Hover over any bar to see the exact committed and completed counts in the tooltip before clicking through.</div>
+        </div>
+      </div>
+      <div class="ui-panel">
+        <div class="ui-chrome"><span>Tab 2 — Team Performance</span></div>
+        <div class="ui-body">
+          <div class="mock-tabs">
+            <div class="mock-tab">📊 ART View</div>
+            <div class="mock-tab active-tab pulse">👥 Team Performance (5)</div>
+          </div>
+          <div class="chart-wrap">
+            <div class="chart-title">Team Performance — Run &amp; Close — 2026<br><small style="color:#999;font-weight:400;">Click on a team name to view Sprint Velocity</small></div>
+            <div style="display:flex;align-items:flex-end;gap:8px;height:100px;padding:0 4px;margin-top:6px;">
+              <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+                <div class="bar-pct">85%</div>
+                <div class="bar-pair">
+                  <div class="bar purple" style="height:70px;"></div>
+                  <div class="bar green"  style="height:59px;"></div>
+                </div>
+                <div class="bar-label" style="font-size:8px;">Code Busters</div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+                <div class="bar-pct">92%</div>
+                <div class="bar-pair">
+                  <div class="bar purple" style="height:65px;"></div>
+                  <div class="bar green"  style="height:60px;"></div>
+                </div>
+                <div class="bar-label" style="font-size:8px;">Eagles</div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:center;flex:1;" id="clickTeamDemo">
+                <div class="bar-pct pulse" style="background:rgba(255,98,0,.12);border-color:var(--fedex-orange);color:var(--fedex-orange);">78%</div>
+                <div class="bar-pair">
+                  <div class="bar purple" style="height:80px;opacity:.7;"></div>
+                  <div class="bar green"  style="height:62px;opacity:.7;"></div>
+                </div>
+                <div class="bar-label" style="font-size:8px;color:var(--fedex-orange);font-weight:700;">Dev-Inators ←click</div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+                <div class="bar-pct">90%</div>
+                <div class="bar-pair">
+                  <div class="bar purple" style="height:60px;"></div>
+                  <div class="bar green"  style="height:54px;"></div>
+                </div>
+                <div class="bar-label" style="font-size:8px;">Hawks</div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+                <div class="bar-pct">88%</div>
+                <div class="bar-pair">
+                  <div class="bar purple" style="height:55px;"></div>
+                  <div class="bar green"  style="height:48px;"></div>
+                </div>
+                <div class="bar-label" style="font-size:8px;">Megaminds</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 7 — TAB 3: SPRINT VELOCITY
+  ══════════════════════════════════════════ -->
+  <div class="slide" id="slide-6">
+    <div class="slide-inner">
+      <div class="narration-panel">
+        <span class="section-tag">Section 6 — Tab 3</span>
+        <div class="slide-title">Sprint Velocity — Deep Dive on a Team</div>
+        <div class="narration">
+          After clicking a team in Tab 2, the <strong>Sprint Velocity tab</strong> opens automatically.
+          <br><br>
+          It contains <strong>three charts</strong>:
+          <ul>
+            <li><strong>Planned vs Delivered stories</strong> — classic velocity chart per sprint</li>
+            <li><strong>Story Points: Planned vs Delivered</strong> — reveals complexity load changes across sprints</li>
+            <li><strong>Delivery Rate % trend line</strong> — orange area chart showing consistency sprint over sprint</li>
+          </ul>
+          To return to the comparison view, click the <strong>✖ Close</strong> button in the top-right corner of the tab.
+          <div class="tip"><strong>Use in retrospectives:</strong> Dips in the delivery rate chart are great conversation starters — they prompt the team to identify what caused the drop and what to improve next sprint.</div>
+        </div>
+      </div>
+      <div class="ui-panel">
+        <div class="ui-chrome"><span>Tab 3 — Sprint Velocity: Dev-Inators</span></div>
+        <div class="ui-body">
+          <div class="mock-tabs">
+            <div class="mock-tab">📊 ART</div>
+            <div class="mock-tab">👥 Teams</div>
+            <div class="mock-tab active-tab pulse">📈 Sprint Velocity — Dev-Inators</div>
+          </div>
+          <div class="chart-wrap" style="margin-bottom:10px;">
+            <div class="chart-title">Sprint Velocity — Dev-Inators</div>
+            <div style="display:flex;align-items:flex-end;gap:6px;height:80px;padding:0 4px;margin-top:6px;">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+                <div class="bar-pair"><div class="bar purple" style="height:60px;"></div><div class="bar green" style="height:48px;"></div></div>
+                <div class="bar-label" style="font-size:8px;">Spr 1</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+                <div class="bar-pair"><div class="bar purple" style="height:65px;"></div><div class="bar green" style="height:52px;"></div></div>
+                <div class="bar-label" style="font-size:8px;">Spr 2</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+                <div class="bar-pair"><div class="bar purple" style="height:55px;"></div><div class="bar green" style="height:50px;"></div></div>
+                <div class="bar-label" style="font-size:8px;">Spr 3</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+                <div class="bar-pair"><div class="bar purple" style="height:70px;"></div><div class="bar green" style="height:62px;"></div></div>
+                <div class="bar-label" style="font-size:8px;">Spr 4</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+                <div class="bar-pair"><div class="bar purple" style="height:68px;"></div><div class="bar green" style="height:65px;"></div></div>
+                <div class="bar-label" style="font-size:8px;">Spr 5</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div class="chart-wrap">
+              <div class="chart-title">Story Points</div>
+              <div style="display:flex;align-items:flex-end;gap:4px;height:50px;padding:0 2px;margin-top:4px;">
+                <div style="flex:1;display:flex;align-items:flex-end;gap:2px;"><div class="bar purple" style="height:40px;width:12px;"></div><div class="bar green" style="height:30px;width:12px;"></div></div>
+                <div style="flex:1;display:flex;align-items:flex-end;gap:2px;"><div class="bar purple" style="height:44px;width:12px;"></div><div class="bar green" style="height:38px;width:12px;"></div></div>
+                <div style="flex:1;display:flex;align-items:flex-end;gap:2px;"><div class="bar purple" style="height:36px;width:12px;"></div><div class="bar green" style="height:34px;width:12px;"></div></div>
+                <div style="flex:1;display:flex;align-items:flex-end;gap:2px;"><div class="bar purple" style="height:48px;width:12px;"></div><div class="bar green" style="height:44px;width:12px;"></div></div>
+                <div style="flex:1;display:flex;align-items:flex-end;gap:2px;"><div class="bar purple" style="height:46px;width:12px;"></div><div class="bar green" style="height:44px;width:12px;"></div></div>
+              </div>
+            </div>
+            <div class="chart-wrap">
+              <div class="chart-title">Delivery Rate %</div>
+              <div class="sparkline">
+                <div class="spark-bar" style="height:48px;"></div>
+                <div class="spark-bar" style="height:40px;"></div>
+                <div class="spark-bar" style="height:45px;"></div>
+                <div class="spark-bar" style="height:44px;"></div>
+                <div class="spark-bar pulse" style="height:58px;border-top-color:#FF6200;background:rgba(255,107,53,.25);"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:9px;color:#aaa;margin-top:3px;">
+                <span>80%</span><span>80%</span><span>91%</span><span>89%</span><span>96%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 8 — SPRINT DETAILS TABLE
+  ══════════════════════════════════════════ -->
+  <div class="slide" id="slide-7">
+    <div class="slide-inner">
+      <div class="narration-panel">
+        <span class="section-tag">Section 7 — Sprint Table</span>
+        <div class="slide-title">Sprint Details Table</div>
+        <div class="narration">
+          Below the velocity charts is the <strong>Sprint Details table</strong> — a row-by-row breakdown of every sprint.
+          <br><br>
+          Each row shows:
+          <ul>
+            <li><strong>Sprint name</strong> and date range</li>
+            <li><strong>Planned / Delivered</strong> story counts</li>
+            <li><strong>Pull Forward</strong> — stories pulled in from the backlog <em>mid-sprint after it started</em></li>
+            <li><strong>Carry Over</strong> — stories brought in from the <em>previous sprint</em> because they weren't finished</li>
+            <li><strong>Planned / Delivered story points</strong></li>
+            <li><strong>Delivery Rate %</strong> — colour-coded for quick scanning</li>
+          </ul>
+          Pull Forward and Carry Over show a dash for future sprints or when none occurred — keeping the table clean.
+          <div class="tip"><strong>Tip:</strong> High carry-over numbers in consecutive sprints signal a capacity or dependency issue worth raising in retrospective.</div>
+        </div>
+      </div>
+      <div class="ui-panel">
+        <div class="ui-chrome"><span>Sprint Details Table</span></div>
+        <div class="ui-body">
+          <div style="font-size:13px;font-weight:700;color:var(--fedex-purple);margin-bottom:10px;">Sprint Details — Dev-Inators</div>
+          <table class="mock-table">
+            <tr>
+              <th>Sprint</th><th>From</th><th>To</th><th>Planned</th><th>Delivered</th>
+              <th>Pull Fwd</th><th>Carry Over</th><th>Del Pts</th><th>Rate</th>
+            </tr>
+            <tr>
+              <td>Sprint 1</td><td>Jan 06</td><td>Jan 19</td><td>12</td><td>10</td>
+              <td><span class="badge-orange">2</span></td><td>–</td><td>38.0</td>
+              <td><span class="badge-purple">83%</span></td>
+            </tr>
+            <tr>
+              <td>Sprint 2</td><td>Jan 20</td><td>Feb 02</td><td>13</td><td>10</td>
+              <td>–</td><td><span class="badge-orange">3</span></td><td>40.0</td>
+              <td><span class="badge-purple">77%</span></td>
+            </tr>
+            <tr>
+              <td>Sprint 3</td><td>Feb 03</td><td>Feb 16</td><td>11</td><td>10</td>
+              <td>–</td><td>–</td><td>34.0</td>
+              <td><span class="badge-green">91%</span></td>
+            </tr>
+            <tr>
+              <td>Sprint 4</td><td>Feb 17</td><td>Mar 02</td><td>14</td><td>13</td>
+              <td><span class="badge-orange">1</span></td><td>–</td><td>44.0</td>
+              <td><span class="badge-green">93%</span></td>
+            </tr>
+            <tr>
+              <td>Sprint 5</td><td>Mar 03</td><td>Mar 16</td><td>13</td><td>13</td>
+              <td>–</td><td>–</td><td>44.0</td>
+              <td><span class="badge-green">100%</span></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 9 — VALIDATION EXPANDER
+  ══════════════════════════════════════════ -->
+  <div class="slide" id="slide-8">
+    <div class="slide-inner">
+      <div class="narration-panel">
+        <span class="section-tag">Section 8 — Story Validation</span>
+        <div class="slide-title">Pull Forward &amp; Carry Over Validation</div>
+        <div class="narration">
+          For teams doing sprint reviews or retrospectives, there's an <strong>expandable audit section</strong> below the sprint table.
+          <br><br>
+          Click <strong>"Validate Pull Forward / Carry Over — Story Details"</strong> to expand it.
+          <br><br>
+          For each sprint where pull-forwards or carry-overs occurred, you see <strong>two side-by-side story tables</strong>:
+          <ul>
+            <li><strong>Pull Forward stories</strong> — created after the sprint started (backlog pull-ins)</li>
+            <li><strong>Carry Over stories</strong> — created before sprint start, not yet delivered</li>
+          </ul>
+          Each table shows: story ID, type (Story / Defect / Spike), title, status, created date, closed date, and estimate.
+          <div class="tip"><strong>Audit trail:</strong> Cross-check these stories directly against the Agility board during sprint review for full transparency.</div>
+        </div>
+      </div>
+      <div class="ui-panel">
+        <div class="ui-chrome"><span>Story Validation Expander</span></div>
+        <div class="ui-body">
+          <div class="mock-expander">
+            <div class="mock-expander-header pulse">
+              🔍 Validate Pull Forward / Carry Over — Story Details
+              <span>▲ expanded</span>
+            </div>
+            <div class="mock-expander-body">
+              <div style="font-size:11px;color:#888;margin-bottom:10px;">
+                Pull Forward = created after sprint started. Carry-over = created before sprint start, not delivered.
+              </div>
+              <div style="font-weight:700;color:var(--text-dark);margin-bottom:8px;font-size:12px;">Sprint 1 (Jan 06 → Jan 19)</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div>
+                  <div style="font-size:11px;font-weight:700;color:var(--fedex-orange);margin-bottom:6px;">Pull Forward: 2 stories</div>
+                  <table class="mock-table">
+                    <tr><th>#</th><th>Type</th><th>Status</th><th>Pts</th></tr>
+                    <tr><td>S-1042</td><td>Story</td><td><span class="badge-green">Done</span></td><td>3</td></tr>
+                    <tr><td>D-218</td><td>Defect</td><td><span class="badge-green">Done</span></td><td>2</td></tr>
+                  </table>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:#aaa;font-style:italic;margin-top:4px;">No carry-overs</div>
+                </div>
+              </div>
+              <div style="border-top:1px solid #eee;margin:12px 0;"></div>
+              <div style="font-weight:700;color:var(--text-dark);margin-bottom:8px;font-size:12px;">Sprint 2 (Jan 20 → Feb 02)</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div><div style="font-size:11px;color:#aaa;font-style:italic;margin-top:4px;">No pull-forwards</div></div>
+                <div>
+                  <div style="font-size:11px;font-weight:700;color:var(--fedex-purple);margin-bottom:6px;">Carry Over: 3 stories</div>
+                  <table class="mock-table">
+                    <tr><th>#</th><th>Type</th><th>Status</th><th>Pts</th></tr>
+                    <tr><td>S-998</td><td>Story</td><td><span class="badge-orange">In Prog</span></td><td>5</td></tr>
+                    <tr><td>S-1001</td><td>Story</td><td><span class="badge-green">Done</span></td><td>3</td></tr>
+                    <tr><td>D-190</td><td>Defect</td><td><span class="badge-green">Done</span></td><td>2</td></tr>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SLIDE 10 — TIPS & FINAL
+  ══════════════════════════════════════════ -->
+  <div class="slide" id="slide-9">
+    <div class="slide-inner" style="grid-template-columns:1fr;">
+      <div class="final-card">
+        <h2>You're Ready to Use the Dashboard!</h2>
+        <p>Here's a quick reference to match each feature to your role and meeting type.</p>
+        <div class="final-grid">
+          <div class="final-item">
+            <div class="fi-icon">🎯</div>
+            <div class="fi-label">PI Planning / RTE Sync<br><small style="opacity:.75;">ART Tab — Committed vs Completed<br>Summary metric cards</small></div>
+          </div>
+          <div class="final-item">
+            <div class="fi-icon">👥</div>
+            <div class="fi-label">Team Review<br><small style="opacity:.75;">Team Performance Tab<br>Click team → Sprint Velocity</small></div>
+          </div>
+          <div class="final-item">
+            <div class="fi-icon">🔍</div>
+            <div class="fi-label">Sprint Retrospective<br><small style="opacity:.75;">Sprint Details Table<br>Pull Forward &amp; Carry Over Validation</small></div>
+          </div>
+          <div class="final-item">
+            <div class="fi-icon">📅</div>
+            <div class="fi-label">Quarter / PI Scope<br><small style="opacity:.75;">Set From / To date filter<br>All charts update automatically</small></div>
+          </div>
+          <div class="final-item">
+            <div class="fi-icon">🔄</div>
+            <div class="fi-label">Live Data<br><small style="opacity:.75;">Hit Refresh after sprint close<br>8-hour session cache</small></div>
+          </div>
+          <div class="final-item">
+            <div class="fi-icon">📈</div>
+            <div class="fi-label">Trend Analysis<br><small style="opacity:.75;">Delivery Rate % chart<br>Multi-sprint velocity trends</small></div>
+          </div>
+        </div>
+        <div style="margin-top:20px;font-size:13px;opacity:.8;margin-bottom:20px;">
+          Select your ART · Pick your teams · Set a date range · Your data is ready.
+        </div>
+        <button class="restart-btn" onclick="goTo(0)">↩ Restart Training</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── NAVIGATION ── -->
+  <div class="nav-row">
+    <button class="nav-btn prev" id="btnPrev" onclick="navigate(-1)" disabled>← Previous</button>
+    <div class="slide-counter" id="slideCounter">1 / 10</div>
+    <button class="nav-btn next" id="btnNext" onclick="navigate(1)">Next →</button>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+  const TOTAL = 10;
+  let current = 0;
+
+  const slides    = document.querySelectorAll('.slide');
+  const dotsRow   = document.getElementById('dotsRow');
+  const fill      = document.getElementById('progressFill');
+  const label     = document.getElementById('progressLabel');
+  const counter   = document.getElementById('slideCounter');
+  const btnPrev   = document.getElementById('btnPrev');
+  const btnNext   = document.getElementById('btnNext');
+
+  const TITLES = [
+    "Introduction","Sign In","Filters","Summary Cards",
+    "ART Chart","Team Performance","Sprint Velocity",
+    "Sprint Table","Story Validation","Quick Reference"
+  ];
+
+  // Build dots
+  for (let i = 0; i < TOTAL; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i === 0 ? ' active' : '');
+    d.title = TITLES[i];
+    d.addEventListener('click', () => goTo(i));
+    dotsRow.appendChild(d);
+  }
+
+  function goTo(idx) {
+    slides[current].classList.remove('active');
+    dotsRow.children[current].classList.remove('active');
+    if (current < idx) dotsRow.children[current].classList.add('done');
+    else dotsRow.children[idx].classList.remove('done');
+
+    current = idx;
+    slides[current].classList.add('active');
+    dotsRow.children[current].classList.add('active');
+    dotsRow.children[current].classList.remove('done');
+
+    const pct = Math.round(((current + 1) / TOTAL) * 100);
+    fill.style.width = pct + '%';
+    label.textContent = `Section ${current + 1} of ${TOTAL} — ${TITLES[current]}`;
+    counter.textContent = `${current + 1} / ${TOTAL}`;
+    btnPrev.disabled = (current === 0);
+    btnNext.disabled = (current === TOTAL - 1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function navigate(dir) { goTo(current + dir); }
+
+  // Keyboard navigation
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' && current < TOTAL - 1) navigate(1);
+    if (e.key === 'ArrowLeft'  && current > 0)         navigate(-1);
+  });
+</script>
+</body>
+</html>
