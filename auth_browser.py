@@ -239,7 +239,20 @@ def browser_login(base_url: str, username: str = "", password: str = "") -> List
     """
     Open Edge/Chrome, navigate to Agility (which redirects to OKTA),
     auto-fill credentials, wait for MFA completion, capture cookies.
+
+    Raises RuntimeError on Linux/cloud (no display for MFA interaction).
+    Use manual_cookie_login() instead on Streamlit Cloud.
     """
+    if platform.system() == "Linux":
+        raise RuntimeError(
+            "Browser-based login cannot run on Streamlit Cloud (no display server for MFA).\n"
+            "Please use the \"Paste Session Cookie\" tab instead:\n"
+            "  1. Open https://www19.v1host.com/FedEx in your own browser and sign in normally.\n"
+            "  2. Press F12 → Application → Cookies → select the site.\n"
+            "  3. Find the session cookie (name contains 'versionone', 'v1', or 'session').\n"
+            "  4. Copy the Name and Value and paste them into the login form."
+        )
+
     from selenium.webdriver.common.by import By
 
     agility_host = base_url.rstrip("/").split("/")[2]
@@ -391,6 +404,28 @@ def _fill_okta_form(driver, username: str, password: str) -> None:
 # ------------------------------------------------------------------------------
 # CLI
 # ------------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------------
+# Manual cookie login (cloud / headless fallback)
+# ------------------------------------------------------------------------------
+
+def manual_cookie_login(cookie_name: str, cookie_value: str, base_url: str) -> List[Dict]:
+    """
+    Build a session from a manually pasted browser cookie.
+    Works on Streamlit Cloud without any browser or MFA interaction.
+    """
+    host = base_url.rstrip("/").split("/")[2]
+    cookies = [
+        {
+            "name":   cookie_name.strip(),
+            "value":  cookie_value.strip(),
+            "domain": host,
+            "path":   "/",
+        }
+    ]
+    save_session(cookies, base_url)
+    return cookies
+
 
 if __name__ == "__main__":
     import sys

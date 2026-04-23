@@ -31,7 +31,7 @@ if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 from agility_client import AgilityClient
-from auth_browser import browser_login, load_saved_session, clear_session
+from auth_browser import browser_login, load_saved_session, clear_session, manual_cookie_login
 from config import TEAM_ROOM_OID, AGILITY_BASE_URL, ART_TEAM_MAP
 from models import TeamModel
 
@@ -486,6 +486,9 @@ _CHART_TITLE_STYLE = dict(
 # LOGIN PAGE
 # ══════════════════════════════════════════════════════════════════════════════
 def show_login() -> None:
+    import platform
+    is_cloud = platform.system() == "Linux"
+
     _, col, _ = st.columns([1, 1.4, 1])
     with col:
         st.markdown(
@@ -494,7 +497,7 @@ def show_login() -> None:
               <div style='font-size:52px;'>📦</div>
               <h1 style='margin:0;font-size:26px;color:#663399;'>FedEx Agility Dashboard</h1>
               <p style='color:#666666;font-size:14px;margin-top:8px;'>
-                Enter your FedEx credentials to sign in via OKTA.
+                Sign in to access the dashboard.
               </p>
             </div>
             """,
@@ -511,36 +514,85 @@ def show_login() -> None:
                 unsafe_allow_html=True,
             )
 
-        username = st.text_input(
-            "USERNAME / EMPLOYEE ID",
-            placeholder="e.g. 123456 or abc.xyz@fedex.com",
-        )
-        password = st.text_input(
-            "PASSWORD",
-            type="password",
-            placeholder="Your FedEx / OKTA password",
-        )
+        # On Streamlit Cloud (Linux) show cookie tab first; on Windows show browser tab first
+        if is_cloud:
+            tab_cookie, tab_browser = st.tabs(["🔑 Paste Session Cookie (Cloud)", "🌐 Browser Login (Windows only)"])
+        else:
+            tab_browser, tab_cookie = st.tabs(["🌐 Browser Login (Windows)", "🔑 Paste Session Cookie (Cloud)"])
 
-        if st.button("🔐  Sign in with OKTA", use_container_width=True, type="primary"):
-            if not username or not password:
-                st.error("Please enter both username and password.")
+        # ── Browser login tab (Windows / local) ──────────────────────────────
+        with tab_browser:
+            if is_cloud:
+                st.warning(
+                    "Browser login is not supported on Streamlit Cloud. "
+                    "Please use the **Paste Session Cookie** tab instead."
+                )
             else:
-                with st.spinner("Opening browser for OKTA login — complete any MFA step…"):
+                st.caption(
+                    "Opens a local Edge/Chrome window. Complete the MFA push — "
+                    "the window closes automatically."
+                )
+                username = st.text_input(
+                    "USERNAME / EMPLOYEE ID",
+                    placeholder="e.g. 123456 or abc.xyz@fedex.com",
+                    key="browser_username",
+                )
+                password = st.text_input(
+                    "PASSWORD",
+                    type="password",
+                    placeholder="Your FedEx / OKTA password",
+                    key="browser_password",
+                )
+                if st.button("🔐  Sign in with OKTA", use_container_width=True, type="primary", key="btn_browser"):
+                    if not username or not password:
+                        st.error("Please enter both username and password.")
+                    else:
+                        with st.spinner("Opening browser for OKTA login — complete any MFA step…"):
+                            try:
+                                cookies = browser_login(AGILITY_BASE_URL, username, password)
+                                st.session_state.cookies = cookies
+                                st.session_state.show_dashboard = True
+                                st.success("Login successful!")
+                                st.rerun()
+                            except ImportError as exc:
+                                st.error(f"Missing dependency: {exc}")
+                            except Exception as exc:
+                                st.error(f"Login failed: {exc}")
+
+        # ── Paste session cookie tab (Cloud / any browser) ───────────────────
+        with tab_cookie:
+            st.markdown(
+                """
+**How to get your session cookie in 3 steps:**
+
+1. Open **[Agility](https://www19.v1host.com/FedEx)** in your browser and sign in with OKTA as normal.
+2. Press **F12** → **Application** tab → **Cookies** → click `https://www19.v1host.com`.
+3. Find the cookie whose **Name** contains `versionone`, `v1session`, or `session` — copy its **Name** and **Value** below.
+                """
+            )
+            cookie_name = st.text_input(
+                "COOKIE NAME",
+                placeholder="e.g.  .versionone  or  V1session",
+                key="manual_cookie_name",
+            )
+            cookie_value = st.text_input(
+                "COOKIE VALUE",
+                type="password",
+                placeholder="Paste the full cookie value here",
+                key="manual_cookie_value",
+            )
+            if st.button("🔑  Connect", use_container_width=True, type="primary", key="btn_cookie"):
+                if not cookie_name or not cookie_value:
+                    st.error("Please enter both the cookie name and its value.")
+                else:
                     try:
-                        cookies = browser_login(AGILITY_BASE_URL, username, password)
+                        cookies = manual_cookie_login(cookie_name, cookie_value, AGILITY_BASE_URL)
                         st.session_state.cookies = cookies
                         st.session_state.show_dashboard = True
-                        st.success("Login successful!")
+                        st.success("Session accepted! Loading dashboard…")
                         st.rerun()
-                    except ImportError as exc:
-                        st.error(f"Missing dependency: {exc}  — Run: pip install selenium webdriver-manager")
                     except Exception as exc:
-                        st.error(f"Login failed: {exc}")
-
-        st.caption(
-            "A browser window will open pre-filled with your credentials. "
-            "Complete any MFA step, then the window closes automatically."
-        )
+                        st.error(f"Failed to set session: {exc}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
