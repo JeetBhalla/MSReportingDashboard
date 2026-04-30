@@ -54,7 +54,8 @@ class SprintSummary(BaseModel):
     begin_date: Optional[str] = None
     end_date: Optional[str] = None
     total_planned: int = 0
-    total_delivered: int = 0
+    total_delivered: int = 0        # all delivered stories incl. PF (used for velocity chart)
+    planned_delivered: int = 0      # delivered stories that were in plan (excl. PF) — used for delivery rate %
     pull_forward_count: int = 0   # stories pulled in from backlog/future mid-sprint
     carry_over_count: int = 0    # stories brought IN from previous sprint (unfinished)
     planned_points: float = 0.0

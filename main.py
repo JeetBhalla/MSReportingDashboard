@@ -30,7 +30,7 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-from agility_client import AgilityClient
+from agility_client import AgilityClient, _is_pf, _is_co
 from auth_browser import browser_login, load_saved_session, clear_session, manual_cookie_login
 from config import TEAM_ROOM_OID, AGILITY_BASE_URL, ART_TEAM_MAP
 from models import TeamModel
@@ -785,162 +785,171 @@ def show_dashboard() -> None:
         if not selected_teams:
             st.info("Select teams from the dropdown to view ART performance.")
         else:
-            with st.spinner("Loading ART performance…"):
-                try:
-                    # Only get counts for selected teams
-                    counts_map = run_async(_async_get_counts(cookies, selected_teams,
-                                                              date_from=_chart_from, date_to=_chart_to))
-                    art_totals: dict[str, dict] = {}
-                    for t in selected_teams:
-                        c = counts_map.get(t.oid)
-                        if not c:
+            try:
+                # Derive committed/completed from already-loaded summaries
+                # (same data source as Sprint Velocity — guarantees consistency).
+                # Apply the same date filter used by the other charts.
+                art_totals: dict[str, dict] = {}
+                for team, summary in zip(selected_teams, summaries):
+                    committed_count = 0
+                    completed_count = 0
+                    for sp in summary.sprints:
+                        sp_begin = (sp.begin_date or "")[:10]
+                        if sp_begin < _chart_from or sp_begin > _chart_to:
                             continue
-                        entry = art_totals.setdefault(t.art, {"art": t.art, "committed": 0, "completed": 0})
-                        entry["committed"] += c["committed"]
-                        entry["completed"] += c["completed"]
+                        committed_count += sp.total_planned
+                        completed_count += sp.total_delivered
+                    if committed_count == 0 and completed_count == 0:
+                        continue
+                    entry = art_totals.setdefault(team.art, {"art": team.art, "committed": 0, "completed": 0})
+                    entry["committed"] += committed_count
+                    entry["completed"] += completed_count
 
-                    art_data = sorted(art_totals.values(), key=lambda x: x["art"])
-                    if art_data:
-                        art_labels = [short_art_name(d["art"]) for d in art_data]
-                        committed  = [d["committed"] for d in art_data]
-                        completed  = [d["completed"] for d in art_data]
-                        g_max      = max(max(committed), max(completed), 1)
+                art_data = sorted(art_totals.values(), key=lambda x: x["art"])
+                if art_data:
+                    art_labels = [short_art_name(d["art"]) for d in art_data]
+                    committed  = [d["committed"] for d in art_data]
+                    completed  = [d["completed"] for d in art_data]
+                    g_max      = max(max(committed), max(completed), 1)
 
-                        annotations = [
-                            dict(
-                                x=art_labels[i],
-                                y=max(d["committed"], d["completed"]) + g_max * 0.06,
-                                text=f"<b>{d['completed'] / d['committed'] * 100:.1f}%</b>" if d["committed"] else "<b>0%</b>",
-                                showarrow=False,
-                                font=dict(size=12, color="#663399"),
-                                bgcolor="rgba(102,51,153,0.08)",
-                                bordercolor="#663399", borderwidth=1, borderpad=3,
-                                xanchor="center",
-                            )
-                            for i, d in enumerate(art_data)
-                        ]
-
-                        fig_art = go.Figure(data=[
-                            go.Bar(name="Committed", x=art_labels, y=committed,
-                                   marker_color="#663399", opacity=0.95,
-                                   text=committed, textposition="outside", textfont=dict(size=11, color="#333333")),
-                            go.Bar(name="Completed",  x=art_labels, y=completed,
-                                   marker_color="#00A86B", opacity=0.95,
-                                   text=completed, textposition="outside", textfont=dict(size=11, color="#333333")),
-                        ])
-                        
-                        # Build title based on number of teams
-                        if len(selected_teams) == 1:
-                            art_chart_title = f"Committed vs Completed — {short_team_name(selected_teams[0].name)} — {_chart_label}"
-                        else:
-                            art_chart_title = f"Committed vs Completed by ART — {len(selected_teams)} Selected Teams — {_chart_label}"
-                        
-                        fig_art.update_layout(
-                            **_CHART_LAYOUT,
-                            title=dict(text=art_chart_title, **_CHART_TITLE_STYLE),
-                            xaxis_title="ART",
-                            yaxis_title="Stories",
-                            yaxis_range=[0, g_max * 1.25],
-                            annotations=annotations,
-                            height=380,
+                    annotations = [
+                        dict(
+                            x=art_labels[i],
+                            y=max(d["committed"], d["completed"]) + g_max * 0.06,
+                            text=f"<b>{d['completed'] / d['committed'] * 100:.1f}%</b>" if d["committed"] else "<b>0%</b>",
+                            showarrow=False,
+                            font=dict(size=12, color="#663399"),
+                            bgcolor="rgba(102,51,153,0.08)",
+                            bordercolor="#663399", borderwidth=1, borderpad=3,
+                            xanchor="center",
                         )
-                        st.plotly_chart(fig_art, use_container_width=True)
+                        for i, d in enumerate(art_data)
+                    ]
+
+                    fig_art = go.Figure(data=[
+                        go.Bar(name="Committed", x=art_labels, y=committed,
+                               marker_color="#663399", opacity=0.95,
+                               text=committed, textposition="outside", textfont=dict(size=11, color="#333333")),
+                        go.Bar(name="Completed",  x=art_labels, y=completed,
+                               marker_color="#00A86B", opacity=0.95,
+                               text=completed, textposition="outside", textfont=dict(size=11, color="#333333")),
+                    ])
+                    
+                    # Build title based on number of teams
+                    if len(selected_teams) == 1:
+                        art_chart_title = f"Committed vs Completed — {short_team_name(selected_teams[0].name)} — {_chart_label}"
                     else:
-                        st.info("No performance data available for selected teams.")
-                except Exception as exc:
-                    st.error(f"Failed to load ART performance: {exc}")
+                        art_chart_title = f"Committed vs Completed by ART — {len(selected_teams)} Selected Teams — {_chart_label}"
+                    
+                    fig_art.update_layout(
+                        **_CHART_LAYOUT,
+                        title=dict(text=art_chart_title, **_CHART_TITLE_STYLE),
+                        xaxis_title="ART",
+                        yaxis_title="Stories",
+                        yaxis_range=[0, g_max * 1.25],
+                        annotations=annotations,
+                        height=380,
+                    )
+                    st.plotly_chart(fig_art, use_container_width=True)
+                else:
+                    st.info("No performance data available for selected teams.")
+            except Exception as exc:
+                st.error(f"Failed to load ART performance: {exc}")
 
     # ── Tab 2: Per-team performance within selected ART ───────────────────────
     with tab2:
         if not selected_teams:
             st.info("Select teams from the filter above.")
         else:
-            with st.spinner(f"Loading team performance for {short_art_name(selected_art)}…"):
-                try:
-                    # Only get counts for selected teams
-                    team_counts = run_async(_async_get_counts(cookies, selected_teams,
-                                                               date_from=_chart_from, date_to=_chart_to))
-                    t_rows = [
-                        {"team": t.name, "team_obj": t,
-                         "committed": team_counts[t.oid]["committed"],
-                         "completed": team_counts[t.oid]["completed"]}
-                        for t in selected_teams
-                        if team_counts.get(t.oid)
-                        and (team_counts[t.oid]["committed"] > 0 or team_counts[t.oid]["completed"] > 0)
-                    ]
-                    t_rows.sort(key=lambda r: r["team"])
+            try:
+                # Derive per-team committed/completed from already-loaded summaries
+                # (same data source as Sprint Velocity — guarantees consistency).
+                t_rows = []
+                for team, summary in zip(selected_teams, summaries):
+                    committed_count = 0
+                    completed_count = 0
+                    for sp in summary.sprints:
+                        sp_begin = (sp.begin_date or "")[:10]
+                        if sp_begin < _chart_from or sp_begin > _chart_to:
+                            continue
+                        committed_count += sp.total_planned
+                        completed_count += sp.total_delivered
+                    if committed_count == 0 and completed_count == 0:
+                        continue
+                    t_rows.append({"team": team.name, "team_obj": team,
+                                   "committed": committed_count, "completed": completed_count})
+                t_rows.sort(key=lambda r: r["team"])
 
-                    if t_rows:
-                        t_labels    = [short_team_name(r["team"]) for r in t_rows]
-                        t_committed = [r["committed"] for r in t_rows]
-                        t_completed = [r["completed"] for r in t_rows]
-                        g_max       = max(max(t_committed), max(t_completed), 1)
+                if t_rows:
+                    t_labels    = [short_team_name(r["team"]) for r in t_rows]
+                    t_committed = [r["committed"] for r in t_rows]
+                    t_completed = [r["completed"] for r in t_rows]
+                    g_max       = max(max(t_committed), max(t_completed), 1)
 
-                        # Create mapping for click handling
-                        team_label_to_data = {short_team_name(r["team"]): r for r in t_rows}
+                    # Create mapping for click handling
+                    team_label_to_data = {short_team_name(r["team"]): r for r in t_rows}
 
-                        t_annotations = [
-                            dict(
-                                x=t_labels[i],
-                                y=max(r["committed"], r["completed"]) + g_max * 0.07,
-                                text=f"<b>{r['completed'] / r['committed'] * 100:.1f}%</b>" if r["committed"] else "<b>0%</b>",
-                                showarrow=False,
-                                font=dict(size=11, color="#663399"),
-                                bgcolor="rgba(102,51,153,0.08)",
-                                bordercolor="#663399", borderwidth=1, borderpad=3,
-                                xanchor="center",
-                            )
-                            for i, r in enumerate(t_rows)
-                        ]
-
-                        fig_teams = go.Figure(data=[
-                            go.Bar(name="Committed", x=t_labels, y=t_committed,
-                                   marker_color="#663399", opacity=0.95,
-                                   text=t_committed, textposition="outside", textfont=dict(size=11, color="#333333"),
-                                   customdata=[[r["team"]] for r in t_rows],
-                                   hovertemplate='<b>%{x}</b><br>Committed: %{y}<br><extra></extra>'),
-                            go.Bar(name="Completed",  x=t_labels, y=t_completed,
-                                   marker_color="#00A86B", opacity=0.95,
-                                   text=t_completed, textposition="outside", textfont=dict(size=11, color="#333333"),
-                                   customdata=[[r["team"]] for r in t_rows],
-                                   hovertemplate='<b>%{x}</b><br>Completed: %{y}<br><extra></extra>'),
-                        ])
-                        fig_teams.update_layout(
-                            **{**_CHART_LAYOUT, "margin": dict(l=50, r=20, t=50, b=110)},
-                            title=dict(text=f"Team Performance — {short_art_name(selected_art)} — {_chart_label}<br><sub style='font-size:12px;color:#666;'>Click on a team name to view Sprint Velocity</sub>", **_CHART_TITLE_STYLE),
-                            xaxis_title="Team (Click to view Sprint Velocity)",
-                            yaxis_title="Stories",
-                            xaxis_tickangle=-35,
-                            yaxis_range=[0, g_max * 1.22],
-                            annotations=t_annotations,
-                            height=max(420, 420 + (len(t_rows) - 10) * 14),
+                    t_annotations = [
+                        dict(
+                            x=t_labels[i],
+                            y=max(r["committed"], r["completed"]) + g_max * 0.07,
+                            text=f"<b>{r['completed'] / r['committed'] * 100:.1f}%</b>" if r["committed"] else "<b>0%</b>",
+                            showarrow=False,
+                            font=dict(size=11, color="#663399"),
+                            bgcolor="rgba(102,51,153,0.08)",
+                            bordercolor="#663399", borderwidth=1, borderpad=3,
+                            xanchor="center",
                         )
-                        
-                        # Display chart and capture click events
-                        # Use dynamic key to ensure chart resets after each team click
-                        chart_key = f"team_chart_{st.session_state.clicked_team_for_velocity['oid'] if st.session_state.clicked_team_for_velocity else 'none'}"
-                        selected_points = st.plotly_chart(fig_teams, use_container_width=True, 
-                                                         on_select="rerun", selection_mode="points", key=chart_key)
-                        
-                        # Handle click on team bar
-                        if selected_points and selected_points.selection and selected_points.selection.points:
-                            point = selected_points.selection.points[0]
-                            clicked_label = point["x"] if isinstance(point, dict) else point.x
-                            if clicked_label in team_label_to_data:
-                                team_data = team_label_to_data[clicked_label]
-                                new_team_oid = team_data["team_obj"].oid
-                                # Only rerun if clicking a different team
-                                current_team_oid = st.session_state.clicked_team_for_velocity["oid"] if st.session_state.clicked_team_for_velocity else None
-                                if new_team_oid != current_team_oid:
-                                    st.session_state.clicked_team_for_velocity = {
-                                        "name": team_data["team"],
-                                        "oid": new_team_oid
-                                    }
-                                    st.rerun()
-                    else:
-                        st.info("No activity data found for teams in this ART.")
-                except Exception as exc:
-                    st.error(f"Failed to load team performance: {exc}")
+                        for i, r in enumerate(t_rows)
+                    ]
+
+                    fig_teams = go.Figure(data=[
+                        go.Bar(name="Committed", x=t_labels, y=t_committed,
+                               marker_color="#663399", opacity=0.95,
+                               text=t_committed, textposition="outside", textfont=dict(size=11, color="#333333"),
+                               customdata=[[r["team"]] for r in t_rows],
+                               hovertemplate='<b>%{x}</b><br>Committed: %{y}<br><extra></extra>'),
+                        go.Bar(name="Completed",  x=t_labels, y=t_completed,
+                               marker_color="#00A86B", opacity=0.95,
+                               text=t_completed, textposition="outside", textfont=dict(size=11, color="#333333"),
+                               customdata=[[r["team"]] for r in t_rows],
+                               hovertemplate='<b>%{x}</b><br>Completed: %{y}<br><extra></extra>'),
+                    ])
+                    fig_teams.update_layout(
+                        **{**_CHART_LAYOUT, "margin": dict(l=50, r=20, t=50, b=110)},
+                        title=dict(text=f"Team Performance — {short_art_name(selected_art)} — {_chart_label}<br><sub style='font-size:12px;color:#666;'>Click on a team name to view Sprint Velocity</sub>", **_CHART_TITLE_STYLE),
+                        xaxis_title="Team (Click to view Sprint Velocity)",
+                        yaxis_title="Stories",
+                        xaxis_tickangle=-35,
+                        yaxis_range=[0, g_max * 1.22],
+                        annotations=t_annotations,
+                        height=max(420, 420 + (len(t_rows) - 10) * 14),
+                    )
+
+                    # Display chart and capture click events
+                    chart_key = f"team_chart_{st.session_state.clicked_team_for_velocity['oid'] if st.session_state.clicked_team_for_velocity else 'none'}"
+                    selected_points = st.plotly_chart(fig_teams, use_container_width=True,
+                                                     on_select="rerun", selection_mode="points", key=chart_key)
+
+                    # Handle click on team bar
+                    if selected_points and selected_points.selection and selected_points.selection.points:
+                        point = selected_points.selection.points[0]
+                        clicked_label = point["x"] if isinstance(point, dict) else point.x
+                        if clicked_label in team_label_to_data:
+                            team_data = team_label_to_data[clicked_label]
+                            new_team_oid = team_data["team_obj"].oid
+                            # Only rerun if clicking a different team
+                            current_team_oid = st.session_state.clicked_team_for_velocity["oid"] if st.session_state.clicked_team_for_velocity else None
+                            if new_team_oid != current_team_oid:
+                                st.session_state.clicked_team_for_velocity = {
+                                    "name": team_data["team"],
+                                    "oid": new_team_oid
+                                }
+                                st.rerun()
+                else:
+                    st.info("No activity data found for teams in this ART.")
+            except Exception as exc:
+                st.error(f"Failed to load team performance: {exc}")
 
     # ── Tab 3: Sprint detail for the clicked team ────────────────────────────
     if tab3:  # Only render if tab3 exists (i.e., a team was clicked)
@@ -1035,7 +1044,7 @@ def show_dashboard() -> None:
                                 line=dict(color="#FF6B35", width=3),
                                 marker=dict(color="#FF6B35", size=8),
                                 text=[f"{v:.0f}%" for v in rate_vals],
-                                textposition="top center",
+                                textposition="bottom center",
                                 textfont=dict(size=10, color="#333333"),
                                 fill="tozeroy",
                                 fillcolor="rgba(255,107,53,0.1)",
@@ -1045,7 +1054,8 @@ def show_dashboard() -> None:
                             **{**_CHART_LAYOUT,
                                "yaxis": dict(gridcolor="#E8E8E8", showline=False,
                                              rangemode='tozero', zeroline=True, zerolinecolor="#333333", zerolinewidth=2,
-                                             ticksuffix="%", range=[0, 110]),
+                                             ticksuffix="%",
+                                             range=[0, max(max(rate_vals) * 1.35, 120)]),
                                "showlegend": False,
                                "margin": dict(l=48, r=20, t=40, b=80)},
                             title=dict(text="Delivery Rate %", **_CHART_TITLE_STYLE),
@@ -1096,11 +1106,11 @@ def show_dashboard() -> None:
 
                             pull_fwd_stories = [
                                 st_obj for st_obj in s.stories
-                                if st_obj.name.startswith("PF:")
+                                if _is_pf(st_obj.name)
                             ]
                             carry_stories = [
                                 st_obj for st_obj in s.stories
-                                if st_obj.name.startswith("CO:")
+                                if _is_co(st_obj.name)
                             ]
 
                             has_pull  = sprint_started and len(pull_fwd_stories) > 0

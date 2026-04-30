@@ -4,14 +4,6 @@ Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "  Agility Sprint Dashboard (Streamlit)     " -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 
-# ── Check .env ────────────────────────────────────────────────────────────────
-if (-not (Test-Path ".env")) {
-    Write-Host "[WARN] .env not found. Copying from .env.example ..." -ForegroundColor Yellow
-    Copy-Item ".env.example" ".env"
-    Write-Host "[INFO] Edit .env with your credentials, then re-run this script." -ForegroundColor Yellow
-    Read-Host "Press Enter to exit"
-    exit 1
-}
 
 # ── Create venv if missing ────────────────────────────────────────────────────
 if (-not (Test-Path ".venv")) {

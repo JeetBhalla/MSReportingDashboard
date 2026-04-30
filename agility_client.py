@@ -10,6 +10,7 @@ API docs       : https://community.versionone.com/VersionOne_Connect/Developer_L
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -23,6 +24,20 @@ from config import (
 from models import SprintModel, SprintSummary, StoryModel, TeamModel, TeamSprintSummary
 
 logger = logging.getLogger(__name__)
+
+# Regex helpers — match PF: / PF- / pf: / pf- (and same for CO) case-insensitively
+_PF_RE = re.compile(r"^pf[:\-]", re.IGNORECASE)
+_CO_RE = re.compile(r"^co[:\-]", re.IGNORECASE)
+
+
+def _is_pf(name: str) -> bool:
+    """Return True if *name* is a Pull Forward story (PF:/PF- prefix, any case)."""
+    return bool(_PF_RE.match(name or ""))
+
+
+def _is_co(name: str) -> bool:
+    """Return True if *name* is a Carry Over story (CO:/CO- prefix, any case)."""
+    return bool(_CO_RE.match(name or ""))
 
 
 # ------------------------------------------------------------------------------
@@ -325,7 +340,7 @@ class AgilityClient:
             f";Timebox.BeginDate<='{_dt2}'"
         )
         params: Dict[str, Any] = {
-            "sel":      "Status.Name",
+            "sel":      "Name,Status.Name",
             "where":    where,
             "fmt":      "json",
             "pageSize": 2000,
@@ -341,10 +356,16 @@ class AgilityClient:
             _count("Story"), _count("Defect"), _count("Spike"),
         )
         all_assets = story_assets + defect_assets + spike_assets
-        committed = len(all_assets)
+        # Exclude Pull Forward stories (PF: prefix) — they were added mid-sprint
+        # and should not count towards committed (planned at sprint start).
+        committed = sum(
+            1 for a in all_assets
+            if not _is_pf(_attr(a, "Name") or "")
+        )
         completed = sum(
             1 for a in all_assets
-            if (_attr(a, "Status.Name") or "") in DELIVERED_STATUSES
+            if not _is_pf(_attr(a, "Name") or "")
+            and (_attr(a, "Status.Name") or "") in DELIVERED_STATUSES
         )
         return {"committed": committed, "completed": completed}
 
@@ -408,16 +429,26 @@ class AgilityClient:
 
             # ── Pull Forward INTO this sprint ──────────────────────────────
             # PF: prefix — explicitly tagged by the team.
-            pull_fwd = [s for s in sprint_stories if s.name.startswith("PF:")]
+            pull_fwd = [s for s in sprint_stories if _is_pf(s.name)]
 
             # ── Carry-over INTO this sprint ─────────────────────────────────
             # CO: prefix — explicitly tagged by the team.
-            carry_ins = [s for s in sprint_stories if s.name.startswith("CO:")]
+            carry_ins = [s for s in sprint_stories if _is_co(s.name)]
+
+            # ── Planned at sprint start ─────────────────────────────────────
+            # Exclude Pull Forward stories — those were added mid-sprint after
+            # the sprint began, so they were not part of the original plan.
+            planned_stories = [s for s in sprint_stories if not _is_pf(s.name)]
+
+            # ── Planned stories that were actually delivered ─────────────────
+            # Used for delivery rate %: how many of the planned stories got done.
+            # PF deliveries are excluded so the rate stays within 0-100%.
+            planned_delivered = [s for s in delivered_in_sprint if not _is_pf(s.name)]
 
             logger.debug(
-                "Sprint %s | planned=%d delivered=%d carry_over=%d pull_forward=%d "
+                "Sprint %s | planned=%d (excl PF) delivered=%d carry_over=%d pull_forward=%d "
                 "(sprint_begin=%s)",
-                sprint.name, len(sprint_stories), len(delivered_in_sprint),
+                sprint.name, len(planned_stories), len(delivered_in_sprint),
                 len(carry_ins), len(pull_fwd), sprint_begin,
             )
 
@@ -427,11 +458,12 @@ class AgilityClient:
                     sprint_name=sprint.name,
                     begin_date=sprint.begin_date,
                     end_date=sprint.end_date,
-                    total_planned=len(sprint_stories),
+                    total_planned=len(planned_stories),
                     total_delivered=len(delivered_in_sprint),
+                    planned_delivered=len(planned_delivered),
                     pull_forward_count=len(pull_fwd),
                     carry_over_count=len(carry_ins),
-                    planned_points=sum(s.estimate or 0 for s in sprint_stories),
+                    planned_points=sum(s.estimate or 0 for s in planned_stories),
                     delivered_points=sum(s.estimate or 0 for s in delivered_in_sprint),
                     pull_forward_points=sum(s.estimate or 0 for s in pull_fwd),
                     carry_over_points=sum(s.estimate or 0 for s in carry_ins),

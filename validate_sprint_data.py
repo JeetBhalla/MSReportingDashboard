@@ -117,6 +117,9 @@ async def main() -> None:
             # Carry-over: CO: prefix only
             carry_ins = [s for s in sprint_stories if s.name.startswith("CO:")]
 
+            # Planned at sprint start: exclude Pull Forward stories (added mid-sprint)
+            planned_stories = [s for s in sprint_stories if not s.name.startswith("PF:")]
+
             sprint_ended   = bool(sprint_end   and sprint_end   < TODAY)
             sprint_started = bool(sprint_begin and sprint_begin <= TODAY)
             sprint_future  = bool(sprint_begin and sprint_begin > TODAY)
@@ -126,6 +129,7 @@ async def main() -> None:
             summaries.append({
                 "sprint":              sprint,
                 "sprint_stories":      sprint_stories,
+                "planned_stories":     planned_stories,
                 "delivered_in_sprint": delivered_in_sprint,
                 "carry_ins":           carry_ins,
                 "pull_fwd":            pull_fwd,
@@ -155,7 +159,7 @@ async def main() -> None:
             s = row["sprint"]
             print(
                 f"{s.name:<45} {row['state']:<10} "
-                f"{len(row['sprint_stories']):>8} "
+                f"{len(row['planned_stories']):>8} "
                 f"{len(row['delivered_in_sprint']):>10} "
                 f"{row.get('pull_fwd_display', '–'):>10} "
                 f"{row.get('carry_over_display', '–'):>11}"
@@ -177,7 +181,8 @@ async def main() -> None:
             print(f"\n{'='*60}")
             print(f"  {s.name}  [{sprint_begin} -> {sprint_end}]  {row['state'].strip()}")
             print(f"  Prev sprint begin      : {row['prev_begin_date'] or '(first sprint)'}")
-            print(f"  Total stories in bucket: {len(row['sprint_stories'])}")
+            print(f"  Total stories in bucket: {len(row['sprint_stories'])} (incl. Pull Forwards)")
+            print(f"  Planned at sprint start: {len(row['planned_stories'])} (excl. PF: stories)")
             print(f"  Delivered in sprint    : {len(row['delivered_in_sprint'])}")
             print(f"  Pull Forward (count)   : {row.get('pull_fwd_display','–')}")
             print(f"  Carry Over             : {row.get('carry_over_display','–')}")

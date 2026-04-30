@@ -1,8 +1,5 @@
 import os
 import unicodedata
-from dotenv import load_dotenv
-
-load_dotenv()
 
 # Agility / VersionOne configuration
 AGILITY_BASE_URL = os.getenv("AGILITY_BASE_URL", "https://www19.v1host.com/FedEx")
