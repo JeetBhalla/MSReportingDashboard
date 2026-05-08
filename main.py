@@ -55,7 +55,7 @@ st.markdown("""
   /* FedEx + Accenture Header Banner */
   .fedex-header {
     background: linear-gradient(135deg, #4D148C 0%, #FF6200 100%);
-    padding: 20px 40px;
+    padding: 10px 30px;
     margin: -5rem -5rem 1rem -5rem;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     border-bottom: 4px solid #FF6200;
@@ -65,7 +65,7 @@ st.markdown("""
     display: flex;
     align-items: center;
     justify-content: center;
-    max-width: 1400px;
+    max-width: 1800px;
     margin: 0 auto;
     position: relative;
     min-height: 44px;
@@ -624,18 +624,25 @@ def show_dashboard() -> None:
 
     st.divider()
 
+    # ── Fetch all teams from Agility on page load (cached) ───────────────────
+    all_teams: list[TeamModel] = []
+    try:
+        if _cache_get("teams_cache", TEAM_ROOM_OID) is None:
+            with st.spinner("Loading teams from Agility…"):
+                all_teams = run_async(_async_get_teams(cookies, TEAM_ROOM_OID))
+        else:
+            all_teams = run_async(_async_get_teams(cookies, TEAM_ROOM_OID))
+    except Exception as exc:
+        st.error(f"Failed to fetch teams: {exc}")
+        return
+
     # ── Top filter bar ────────────────────────────────────────────────────────
     fc1, fc2, fc3, fc4, fc5 = st.columns([2.5, 2.5, 1.5, 1.5, 1])
 
     with fc1:
         arts = sorted(ART_TEAM_MAP.keys())
         DEFAULT_ART = "SCO - P&D - Run and Close"
-        # Find default index, fallback to first ART if default not found
-        if DEFAULT_ART in arts:
-            default_idx = arts.index(DEFAULT_ART)
-        else:
-            default_idx = 0 if arts else 0
-        
+        default_idx = arts.index(DEFAULT_ART) if DEFAULT_ART in arts else 0
         selected_art = st.selectbox(
             "ART",
             arts,
@@ -643,15 +650,11 @@ def show_dashboard() -> None:
             key="art_selector",
         )
 
+    # Filter teams for the selected ART
     teams: list[TeamModel] = []
     if selected_art:
-        try:
-            all_teams = run_async(_async_get_teams(cookies, TEAM_ROOM_OID))
-            art_lower = selected_art.strip().lower()
-            teams = [t for t in all_teams if t.art and t.art.lower() == art_lower]
-        except Exception as exc:
-            st.error(f"Failed to fetch teams: {exc}")
-            return
+        art_lower = selected_art.strip().lower()
+        teams = [t for t in all_teams if t.art and t.art.lower() == art_lower]
 
     with fc2:
         if not teams:
@@ -685,6 +688,10 @@ def show_dashboard() -> None:
         st.info("👆 Select one or more teams from the dropdown above to view sprint data and graphs.")
         return
 
+    if not date_from or not date_to:
+        st.info("📅 Please select both **From** and **To** dates to populate the graphs.")
+        return
+
     # ── Load team summaries and aggregate data ────────────────────────────────
     current_year = time.localtime().tm_year
     team_names_str = ", ".join([short_team_name(t.name) for t in selected_teams[:3]])
@@ -711,10 +718,8 @@ def show_dashboard() -> None:
     sprints = [s for s in all_sprints if s.total_planned > 0 or s.total_delivered > 0] if all_sprints else []
     sprints.sort(key=lambda s: (s.begin_date or ""))
 
-    if date_from:
-        sprints = [s for s in sprints if (s.begin_date or "")[:10] >= str(date_from)]
-    if date_to:
-        sprints = [s for s in sprints if (s.begin_date or "")[:10] <= str(date_to)]
+    # Both dates are guaranteed set (enforced above)
+    sprints = [s for s in sprints if str(date_from) <= (s.begin_date or "")[:10] <= str(date_to)]
 
     # ── Stat cards ────────────────────────────────────────────────────────────
     total_planned   = sum(s.total_planned   for s in sprints)
@@ -769,16 +774,10 @@ def show_dashboard() -> None:
         tabs = st.tabs(tab_list)
         tab1, tab2 = tabs[0], tabs[1]
         tab3 = None
-    # Effective date bounds for the two ART charts: use UI filter if set,
-    # otherwise default to the current calendar year.
-    _today = date.today()
-    _chart_from = str(date_from) if date_from else f"{_today.year}-01-01"
-    _chart_to   = str(date_to)   if date_to   else f"{_today.year}-12-31"
-    _chart_label = (
-        f"{_chart_from} → {_chart_to}"
-        if (date_from or date_to)
-        else str(_today.year)
-    )
+    # Effective date bounds — both dates are guaranteed to be set at this point.
+    _chart_from = str(date_from)
+    _chart_to   = str(date_to)
+    _chart_label = f"{_chart_from} → {_chart_to}"
 
     # ── Tab 1: ART-level performance (filtered by selected teams) ────────────
     with tab1:
@@ -976,10 +975,8 @@ def show_dashboard() -> None:
                         clicked_sprints = active if active else clicked_sprints
                         clicked_sprints.sort(key=lambda s: (s.begin_date or ""))
 
-                        if date_from:
-                            clicked_sprints = [s for s in clicked_sprints if (s.begin_date or "")[:10] >= str(date_from)]
-                        if date_to:
-                            clicked_sprints = [s for s in clicked_sprints if (s.begin_date or "")[:10] <= str(date_to)]
+                        # Both dates are guaranteed set (enforced above)
+                        clicked_sprints = [s for s in clicked_sprints if str(date_from) <= (s.begin_date or "")[:10] <= str(date_to)]
 
                     except Exception as exc:
                         st.error(f"Failed to load sprint data: {exc}")
@@ -1161,12 +1158,39 @@ def show_dashboard() -> None:
                             st.divider()
 
 
+# ── Footer ────────────────────────────────────────────────────────────────────
+def show_footer() -> None:
+    st.markdown("""
+    <style>
+      .fdx-footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        z-index: 9999;
+        background: linear-gradient(135deg, #4D148C 0%, #FF6200 100%);
+        color: rgba(255,255,255,0.85);
+        font-size: 12px;
+        text-align: center;
+        padding: 8px 40px;
+        letter-spacing: 0.04em;
+        border-top: 3px solid #FF6200;
+      }
+      .fdx-footer .sep { opacity: 0.4; margin: 0 6px; }
+    </style>
+    <div class="fdx-footer">
+      Agility Sprint Dashboard &nbsp;<span class="sep">|</span>&nbsp; For internal reporting use
+    </div>
+    """, unsafe_allow_html=True)
+
+
 # ── Entry point ────────────────────────────────────────────────────────────────
 def main() -> None:
     if st.session_state.show_dashboard and st.session_state.cookies:
         show_dashboard()
     else:
         show_login()
+    show_footer()
 
 
 main()
