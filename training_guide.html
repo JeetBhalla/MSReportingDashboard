@@ -369,35 +369,38 @@
     <div class="slide-inner">
       <div class="narration-panel">
         <span class="section-tag">Section 1 — Sign In</span>
-        <div class="slide-title">Signing In with OKTA</div>
+        <div class="slide-title">Signing In — Paste Session Cookie</div>
         <div class="narration">
-          When you first open the dashboard you'll see the <strong>login page</strong>.
+          Because the dashboard runs on <strong>Streamlit Cloud</strong>, the browser-based OKTA login is not available. You must sign in using the <strong>"Paste Session Cookie"</strong> method.
           <br><br>
           <strong>Steps:</strong>
-          <ul>
-            <li>Enter your <strong>FedEx employee ID</strong> or email address</li>
-            <li>Enter your <strong>OKTA password</strong></li>
-            <li>Click <strong>Sign in with OKTA</strong></li>
-            <li>A browser window opens — approve the <strong>MFA push notification</strong> on your phone</li>
-            <li>The window closes automatically and you land on the dashboard</li>
-          </ul>
+          <ol>
+            <li>Open <a href="https://www19.v1host.com/FedEx" target="_blank" style="color:var(--fedex-purple);">https://www19.v1host.com/FedEx</a> in your browser and log in with OKTA as usual.</li>
+            <li>Open <strong>DevTools</strong> (press <kbd>F12</kbd>) → go to the <strong>Application</strong> tab.</li>
+            <li>Under <em>Storage → Cookies → https://www19.v1host.com</em>, find the cookie named <strong><code>V1Host_FedEx</code></strong> (or similar session cookie).</li>
+            <li>Copy its full <strong>Value</strong>.</li>
+            <li>Back in the dashboard login page, click the <strong>"Paste Session Cookie"</strong> tab.</li>
+            <li>Paste the value into the input field and click <strong>Submit Cookie</strong>.</li>
+          </ol>
+          <br>
           Your session stays active for <strong>8 hours</strong>. On your next visit the banner will show <em>"Existing session found"</em> — click <strong>Go to Dashboard</strong> to skip re-login.
-          <div class="tip"><strong>Tip:</strong> If you're on Streamlit Cloud, use the <strong>"Paste Session Cookie"</strong> tab — copy the cookie value from your browser's DevTools after logging in normally.</div>
+          <div class="tip"><strong>Note:</strong> The "Sign in with OKTA" tab (browser popup) does <strong>not</strong> work on Streamlit Cloud — always use the <strong>"Paste Session Cookie"</strong> tab.</div>
         </div>
       </div>
       <div class="ui-panel">
-        <div class="ui-chrome"><span>Sign In</span></div>
+        <div class="ui-chrome"><span>Sign In — Paste Session Cookie</span></div>
         <div class="login-mock">
           <div class="login-icon">📦</div>
           <div class="login-title">FedEx Agility Dashboard</div>
-          <div class="login-sub">Enter your FedEx credentials to sign in via OKTA.</div>
-          <div class="session-banner">✅ Existing session found</div>
-          <input class="mock-input highlight" value="Go to Dashboard →" readonly style="text-align:center;cursor:pointer;font-weight:700;color:var(--fedex-purple);">
-          <div style="font-size:11px;color:#aaa;text-align:center;">— or sign in again below —</div>
-          <input class="mock-input" placeholder="USERNAME / EMPLOYEE ID" readonly>
-          <input class="mock-input" placeholder="PASSWORD  ••••••••" readonly>
-          <div class="mock-primary-btn pulse">🔐  Sign in with OKTA</div>
-          <div style="font-size:10px;color:#aaa;text-align:center;">A browser window will open. Approve the MFA push — window closes automatically.</div>
+          <div class="login-sub">Streamlit Cloud deployment — use cookie login only.</div>
+          <div style="display:flex;gap:0;width:100%;border:1px solid #D9C8F0;border-radius:8px;overflow:hidden;font-size:12px;margin-top:4px;">
+            <div style="flex:1;padding:8px;background:#eee;color:#aaa;text-align:center;cursor:not-allowed;">🔐 Sign in with OKTA<br><span style="font-size:10px;">(not available)</span></div>
+            <div style="flex:1;padding:8px;background:var(--fedex-purple);color:#fff;text-align:center;font-weight:700;" class="pulse">📋 Paste Session Cookie</div>
+          </div>
+          <div style="font-size:11px;color:#888;text-align:left;width:100%;margin-top:6px;">Paste the <strong>V1Host_FedEx</strong> cookie value from DevTools:</div>
+          <input class="mock-input highlight" placeholder="Paste cookie value here…" readonly style="font-size:11px;">
+          <div class="mock-primary-btn pulse">Submit Cookie →</div>
+          <div style="font-size:10px;color:#aaa;text-align:center;">Get cookie: DevTools → Application → Cookies → V1Host_FedEx</div>
         </div>
       </div>
     </div>
