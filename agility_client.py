@@ -474,6 +474,20 @@ class AgilityClient:
         # Sort by begin date
         summaries.sort(key=lambda x: x.begin_date or "")
 
+        # ── Adjust delivered count for carry-overs to the next sprint ────────
+        # Stories carried from sprint N into sprint N+1 are tagged CO: and live
+        # in sprint N+1's bucket.  They represent work that was NOT finished in
+        # sprint N, so sprint N's delivered count should be reduced by that
+        # carry-out volume (both count and points).
+        for i in range(len(summaries) - 1):
+            carry_out_count  = summaries[i + 1].carry_over_count
+            carry_out_points = summaries[i + 1].carry_over_points
+            # Guard against sentinel values (-1) set for future sprints later
+            if carry_out_count > 0:
+                summaries[i].total_delivered    = max(0, summaries[i].total_delivered    - carry_out_count)
+                summaries[i].planned_delivered  = max(0, summaries[i].planned_delivered  - carry_out_count)
+                summaries[i].delivered_points   = max(0.0, summaries[i].delivered_points - carry_out_points)
+
         # ── Apply sentinels for future sprints ───────────────────────────────
         # Sentinel (-1): sprint not yet started → pull_forward and carry_over
         # are not meaningful yet, display "–" in the UI.
